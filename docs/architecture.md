@@ -98,7 +98,15 @@ gain = gain × 悟道卡(10000|20000) / 10000
 
 `engine/surveys.py` 是纯函数，没有 IO：
 
-- `baseline_level(answers)`：4 题共 0–10 分，≥10 → LV3，≥5 → LV2，否则 LV1
+- `baseline_specs()`：七个内置技能各一套题，`__default__` 给自建技能用
+  - 英语口语：CEFR can-do + IELTS Speaking 分数带 + 连说时长 + 真实场合 + 对方理解度
+  - 英语读写：CEFR 读写 + IELTS/TOEFL + 每周阅读量 + 写作产出类型
+  - 西班牙语：DELE A1–C2 + 原速听力 + 沉浸经历 + 学习年限 + 真实使用
+  - 跑步技术：周跑量 + 5K/半马/全马成绩 + 训练结构 + 技术与伤病（Daniels VDOT）
+  - 健身技术：训练年限 + 深蹲/卧推/硬拉相对体重 + 动作是否有人纠正（NSCA/ACSM）
+  - 电脑办公软件技术：Excel 深度 + 文档演示 + 自动化 + 数据规模 + 是否被同事依赖
+  - 剪辑技术：作品类型 + 全流程独立度 + 软件范围 + 交付与客户 + 外部反馈
+- `baseline_level(answers, skill_id)`：按该技能题库算得分率。`≥85% → LV6`（且至少 3 题落在该题最高档的 80% 以上，否则降到 LV5）、`≥76% → LV5`、`≥58% → LV4`、`≥38% → LV3`、`≥20% → LV2`，其余 LV1；自建技能封顶 LV3
 - `session_factor_bps(answers)`：4 项连乘后夹在 8000–11200（即 0.80–1.12）
 
 起点等级只写 `state.baseline_level`（等级地板），**不写 `total_exp`**；已有练习记录或

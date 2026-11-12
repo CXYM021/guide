@@ -546,7 +546,7 @@
   <div class="sheet" id="sheet">
     <div class="grab"></div>
     <h3>记录一次修行</h3>
-    <div class="hint" id="sheet-hint">难度看「有多吃力」：1 很轻松 · 3 有点吃力 · 5 拼尽全力。质量看「做得有多好」：照实填 0–100。反馈优先选客观度量或他人点评。</div>
+    <div class="hint" id="sheet-hint">难度看「有多吃力」：1 很轻松 · 3 有点吃力 · 5 拼尽全力。打开时已按你的等级对齐；低于等级会被当成舒适区折价。质量看「做得有多好」：照实填 0–100。反馈优先选客观度量或他人点评。</div>
     <div class="fgroup">
       <label>技能 <select id="p-skill"></select></label>
       <label>任务标识 <input id="p-key" type="text" placeholder="如：口语跟读"></label>
@@ -580,7 +580,7 @@
   <div class="sheet" id="base-sheet">
     <div class="grab"></div>
     <h3>先 认 一 认 · 起 点</h3>
-    <div class="hint" id="base-hint">这四问只决定起始等级（最高 LV3），不送经验；之后的等级仍要自己练出来。</div>
+    <div class="hint" id="base-hint">每题按你「做得到的事实」选：考试分数、比赛成绩、作品类型、相对力量。自评最高 LV6，只抬等级下限，不送经验。</div>
     <div id="base-body"></div>
     <div class="quick" style="margin-top:8px">
       <button class="mini" id="base-later">稍 后 再 说</button>
@@ -788,10 +788,12 @@ function renderToday(d) {
     const pct = s.is_max_level ? 100 : s.percent;
     // 卡级把所有未通过项一次说全，不再只显示第一条造成「只说一半」。
     const missing = s.missing || [];
+    const floorTag = (s.baseline_level && s.baseline_level > s.exp_level)
+      ? '<span class="tag-gate">自评起点 LV' + s.baseline_level + '</span>' : '';
     const gate = s.gate_blocked
       ? '<span class="tag-gate">经验够 LV' + s.exp_level + ' · ' +
           (missing.length ? esc(missing.join('；')) : '达标校验未放行') + '</span>'
-      : (s.is_max_level ? '已至圆满' : '还差 ' + s.remaining_exp + ' 点');
+      : ((s.is_max_level ? '已至圆满' : '还差 ' + s.remaining_exp + ' 点') + floorTag);
     return '<div class="skill" data-skill="' + esc(s.skill_id) + '">' +
       '<div class="skill-top"><div><span class="skill-name">' + esc(s.skill_id) + '</span>' +
         '<span class="skill-realm">' + esc(s.realm) + '</span></div>' +
@@ -1124,10 +1126,27 @@ function renderDecisions(d) {
 }
 
 /* ---------------- 抽屉 ---------------- */
+function levelOf(skillId) {
+  const s = (skillData && skillData.skills || []).find(x => x.skill_id === skillId);
+  return s ? Number(s.level) || 1 : 1;
+}
+function syncDifficulty(skillId) {
+  // 难度 1–5 对的是「相对你当前等级有多吃力」。等级越高，默认越要用高档，
+  // 否则 LV6 的人按默认 3 记一次，会被判定成舒适区，只拿一两成的收益。
+  const band = Math.min(5, Math.max(1, levelOf(skillId)));
+  $('p-d').value = band;
+  $('p-d').dataset.band = String(band);
+  const s = (skillData && skillData.skills || []).find(x => x.skill_id === skillId);
+  if (s && s.level >= 5) {
+    $('sheet-hint').textContent = '当前 ' + skillId + ' 是 LV' + s.level +
+      '：难度 ' + band + ' 才算出舒适区；难度再低会按「低挑战」折价。质量照实填 0–100。';
+  }
+}
 function openSheet(skillId) {
   if (!rulesData) { toast('规则尚未载入'); return; }
   if (skillId) $('p-skill').value = skillId;
   renderMetricInputs($('p-skill').value);
+  syncDifficulty($('p-skill').value);
   renderSurveyBlock();
   $('mask').classList.add('on'); $('sheet').classList.add('on');
 }
@@ -1155,7 +1174,7 @@ function renderMetricInputs(skillId, boxId) {
   }
   box.innerHTML = h;
 }
-$('p-skill').onchange = () => renderMetricInputs($('p-skill').value);
+$('p-skill').onchange = () => { renderMetricInputs($('p-skill').value); syncDifficulty($('p-skill').value); };
 
 function collectMetrics(boxId) {
   const m = {};
@@ -1267,33 +1286,82 @@ async function ensureSurveys() {
   try { surveyData = await api('/api/surveys'); } catch (e) { surveyData = null; }
   return surveyData;
 }
+let baseResultMode = false;
+function baseSpec(skill) {
+  if (!surveyData) return null;
+  const by = surveyData.baseline_by_skill || {};
+  return by[skill] || surveyData.baseline_default || null;
+}
+function baseQuestionsHtml(skill) {
+  const spec = baseSpec(skill);
+  if (!spec) return '';
+  return spec.questions.map(q => '<div class="row"><label>' + esc(q.label) +
+    '<select data-base="' + esc(q.key) + '">' + optionHtml(q.options, '请选择') +
+    '</select></label></div>').join('');
+}
+function updateBaseSkill() {
+  const skill = $('base-skill') ? $('base-skill').value : '';
+  const spec = baseSpec(skill);
+  if (!spec) return;
+  $('base-questions').innerHTML = baseQuestionsHtml(skill);
+  $('base-framework').textContent = '对照标准：' + spec.framework + '｜自评最高 LV' + spec.max_level;
+}
 function openBaseline() {
   const d = skillData;
   if (!surveyData || !d || !d.baseline || !d.baseline.pending.length) return;
+  baseResultMode = false;
   baseTargets = d.baseline.pending.slice();
   $('base-body').innerHTML =
     '<div class="row"><label>技能 <select id="base-skill">' +
     baseTargets.map(s => '<option value="' + esc(s) + '">' + esc(s) + '</option>').join('') +
     '</select></label></div>' +
-    surveyData.baseline.map(q => '<div class="row"><label>' + esc(q.label) +
-      '<select data-base="' + esc(q.key) + '">' + optionHtml(q.options) +
-      '</select></label></div>').join('');
+    '<div class="hint" id="base-framework" style="margin:6px 0"></div>' +
+    '<div id="base-questions"></div>';
+  $('base-skill').onchange = updateBaseSkill;
+  updateBaseSkill();
   $('base-hint').textContent = '还有 ' + baseTargets.length +
-    ' 个技能没定起点；这四问只给起始等级（最高 LV3），不送经验。';
+    ' 个技能没定起点；按你「做得到的事实」选，不是按感觉。只抬等级下限，不送经验。';
+  $('base-submit').textContent = '确 认 起 点';
   $('mask').classList.add('on'); $('base-sheet').classList.add('on');
 }
-function closeBaseline() { $('base-sheet').classList.remove('on'); $('mask').classList.remove('on'); }
+function closeBaseline() {
+  baseResultMode = false;
+  $('base-sheet').classList.remove('on'); $('mask').classList.remove('on');
+}
+function showBaseResult(skill, r) {
+  const ev = (r.strong_evidence || []).map(x => '· ' + esc(x)).join('<br>');
+  $('base-body').innerHTML =
+    '<div class="hint" style="margin:6px 0">' + esc(skill) + ' 的起点</div>' +
+    '<div style="font-size:30px;font-weight:600;letter-spacing:1px">LV' + esc(String(r.level || '?')) + '</div>' +
+    '<div class="hint">' + esc(r.framework || '') + '｜得分 ' + esc(String(r.percent || 0)) + '%</div>' +
+    (ev ? '<div class="hint" style="margin-top:8px">最强证据：<br>' + ev + '</div>' : '') +
+    '<div class="hint" style="margin-top:8px">' + esc(r.why || '') + '</div>';
+  $('base-hint').textContent = baseTargets.length
+    ? '还有 ' + baseTargets.length + ' 个技能可以认，也可以稍后再说。'
+    : '都认完了。起点只是下限，接下来靠练习把等级真的练上去。';
+  $('base-submit').textContent = baseTargets.length ? '下 一 个 技 能' : '开 始 练 习';
+  baseResultMode = true;
+}
 async function submitBaseline() {
+  if (baseResultMode) {
+    if (baseTargets.length) { openBaseline(); } else { closeBaseline(); }
+    return;
+  }
   const skill = $('base-skill') ? $('base-skill').value : '';
-  if (!skill) { closeBaseline(); return; }
+  const spec = baseSpec(skill);
+  if (!skill || !spec) { closeBaseline(); return; }
   const answers = {};
-  document.querySelectorAll('#base-body [data-base]').forEach(el => { answers[el.dataset.base] = el.value; });
+  for (const q of spec.questions) {
+    const el = document.querySelector('#base-questions [data-base="' + q.key + '"]');
+    if (!el || !el.value) { toast('还有题没选：' + q.label); if (el) el.focus(); return; }
+    answers[q.key] = el.value;
+  }
   try {
     const res = await api('/api/baseline', { skill_id: skill, answers });
     const r = res.baseline_result || {};
-    toast('已记下 ' + skill + ' 的起点 · LV' + (r.level || '?'));
     baseTargets = baseTargets.filter(x => x !== skill);
-    if (baseTargets.length) { openBaseline(); } else { closeBaseline(); }
+    showBaseResult(skill, r);
+    toast(skill + ' 起点 LV' + (r.level || '?'));
     render(res);
   } catch (e) { toast('起点未保存：' + e.message); }
 }

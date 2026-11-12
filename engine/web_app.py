@@ -49,7 +49,7 @@ from data_vault import (
 from web_ui import HTML_PAGE
 from world_state import WorldState
 from surveys import (
-    BASELINE_MAX_LEVEL, baseline_level, baseline_questions,
+    BASELINE_MAX_LEVEL, baseline_level, baseline_questions, baseline_specs,
     session_factor_bps, session_questions,
 )
 
@@ -823,15 +823,25 @@ def submit_practice(body: dict) -> dict:
 
 
 def surveys_payload() -> dict:
-    """两张问卷的题面。前端不再硬编码选项，改题只改后端一处。"""
+    """两张问卷的题面。前端不再硬编码选项，改题只改后端一处。
+
+    首登问卷按技能各有一套：英语用 CEFR/IELTS，西班牙语用 DELE，
+    跑步用 VDOT 成绩表，健身用相对力量标准，办公与剪辑用交付物类型。
+    自建技能退回通用题，最高只给 LV3。
+    """
     return {
         "ok": True,
         "baseline_max_level": BASELINE_MAX_LEVEL,
-        "baseline": baseline_questions(),
+        "baseline_by_skill": baseline_specs(),
+        "baseline_default": {
+            "framework": "通用自评（自建技能没有外部标准可对照）",
+            "max_level": 3,
+            "questions": baseline_questions(),
+        },
         "session": session_questions(),
         "note": {
-            "baseline": ("首登自评只决定「信用起点」，最高 LV3，且不加经验；"
-                         "LV4 起仍要经验与达标校验。"),
+            "baseline": ("首登问卷按技能对照各自的标准，最高 LV6，且不加经验；"
+                         "LV7 起仍要经验、达标校验与复测。"),
             "session": ("练习问卷只把本次增益乘 0.80–1.12，"
                         "不改变本次是否计入，也不参与门槛统计。"),
         },
@@ -847,8 +857,8 @@ def apply_baseline(body: dict) -> dict:
     if not skill_id:
         raise ValueError("缺少 skill_id")
     answers = body.get("answers")
-    scored = baseline_level(answers)          # 未知/缺项取值直接拒绝
-    level = min(BASELINE_MAX_LEVEL, int(scored["level"]))
+    scored = baseline_level(answers, skill_id=skill_id)  # 未知/缺项取值直接拒绝
+    level = int(scored["level"])
     progress = system.apply_baseline(skill_id, level, answers=answers,
                                      now=STATE["clock"]())
     out = skill_payload()

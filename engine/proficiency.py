@@ -1221,6 +1221,15 @@ class ProficiencySystem:
             required = table.config.rule.cost(level)
             is_max = False
             percent = 100.0
+        elif level > exp_level:
+            # 自评起点高于经验等级：这是「信用下限」，不是练出来的。
+            # 按当前等级算进度，让用户看到「要把经验补到这一级还差多少」。
+            threshold = table.exp_for_level(level)
+            current = max(0, eff - threshold)
+            required = (0 if is_max
+                        else table.config.rule.cost(level))
+            percent = 0.0 if required == 0 else round(
+                min(100.0, max(0.0, current / required * 100.0)), 4)
         elif is_max:
             percent = 100.0
         elif required == 0:
