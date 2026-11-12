@@ -1206,7 +1206,7 @@ ALTRUISM_RULES: dict = {
     "reputation": {"guard": 30, "encourage": 5, "share": 10},
     "daily_reputation_cap": 100,
     "exchange_cost": {"insight_card": 60, "freeze_card": 40},
-    "insight_multiplier_bps": 20_000,
+    "insight_multiplier_bps": 12_000,
     "base_multiplier_bps": 10_000,
     "max_cards": 9,
     "max_deeds": 5_000,

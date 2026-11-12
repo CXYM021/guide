@@ -48,6 +48,7 @@ from data_vault import (
 )
 from web_ui import HTML_PAGE
 from world_state import WorldState
+import checkpoints as quizzes
 from surveys import (
     BASELINE_MAX_LEVEL, baseline_level, baseline_questions, baseline_specs,
     session_factor_bps, session_questions,
@@ -455,6 +456,23 @@ def add_custom_skill(body: dict) -> dict:
             **custom_skills_payload()}
 
 
+def set_skill_archived(body: dict) -> dict:
+    """归档 / 恢复内置技能：只改展示，不动记录与等级。"""
+    sid = str(body.get("skill_id") or "").strip()
+    if not sid:
+        raise ValueError("缺少 skill_id")
+    if "archived" not in body:
+        raise ValueError("缺少 archived（true / false）")
+    archived = body.get("archived")
+    if not isinstance(archived, bool):
+        raise ValueError("archived 必须是 true 或 false")
+    system: ProficiencySystem = STATE["system"]
+    progress = system.set_archived(sid, archived, now=STATE["clock"]())
+    system.flush()
+    return {"ok": True, "skill_id": sid, "archived": archived,
+            "progress": progress.to_dict(), **skill_payload()}
+
+
 def remove_custom_skill(body: dict) -> dict:
     sid = str(body.get("skill_id") or "").strip()
     registry: CustomSkillRegistry = STATE["custom"]
@@ -617,6 +635,8 @@ def guidance(system: ProficiencySystem, now: int) -> dict:
         gains.setdefault(e["skill_id"], max(0, int(e["delta"])))
     scored, missing_by_skill = [], {}
     for sid, p in system.list_progress(now=now).items():
+        if p.archived:            # 归档的技能不进「今日最优一手」
+            continue
         info = system.assess(sid, now=now)
         missing_by_skill[sid] = _missing_items(info)
         rule = effective_rule(sid)
@@ -822,6 +842,94 @@ def submit_practice(body: dict) -> dict:
     return payload
 
 
+def _custom_baseline_specs() -> dict:
+    registry = STATE.get("custom")
+    if not registry:
+        return {}
+    return {sid: custom_baseline_spec(rule)
+            for sid, rule in registry.rules().items()}
+
+
+def checkpoint_payload_for(skill_id: str) -> dict:
+    """某技能的升级验证题（不含答案）+ 当前等级信息。"""
+    spec = quizzes.spec(skill_id)
+    if spec is None:
+        raise ValueError("该技能没有等级验证题（只有语言类技能需要做题）")
+    system: ProficiencySystem = STATE["system"]
+    progress = system.list_progress(now=STATE["clock"]()).get(skill_id)
+    if progress is None:
+        raise ValueError("技能不存在")
+    return {"ok": True, **spec,
+            "current_level": progress.level,
+            "exp_level": progress.exp_level,
+            "verified_level": progress.verified_level,
+            "target_level": min(progress.exp_level, progress.level + 1)}
+
+
+def submit_checkpoint(body: dict) -> dict:
+    sid = str(body.get("skill_id") or "").strip()
+    if not sid:
+        raise ValueError("缺少 skill_id")
+    result = quizzes.grade(sid, body.get("answers") or {})
+    system: ProficiencySystem = STATE["system"]
+    if result["passed"]:
+        progress = system.list_progress(now=STATE["clock"]()).get(sid)
+        base = progress.level if progress else 1
+        target = min(progress.exp_level if progress else base, base + 1)
+        system.mark_verified(sid, max(1, target), now=STATE["clock"]())
+        system.flush()
+        result["verified_level"] = max(1, target)
+        result["message"] = "验证通过，按经验重新结算等级"
+    else:
+        result["message"] = "还没全对：下面有每题解析，再来一次，不扣经验"
+    out = skill_payload()
+    out["checkpoint_result"] = result
+    return out
+
+
+def custom_baseline_spec(rule) -> dict:
+    """自建技能的起点问卷：直接问「你的指标现在到哪一档」。
+
+    自建技能没有外部考试标准，但用户自己填过指标与等级要求，
+    所以这里问的是可核对的数值档位（不是「你觉得自己怎样」），
+    并且等级取最弱的一项——木桶效应，不做平均。
+    """
+    questions = []
+    for m in rule.metrics:
+        req = tuple(int(x) for x in m.level_requirements)
+        options = [
+            {"value": "none", "label": f"还不到 LV2（< {req[1]} {m.unit}）", "points": 1},
+            {"value": "lv3", "label": f"大约 LV3（{req[2]} {m.unit}）", "points": 3},
+            {"value": "lv5", "label": f"大约 LV5（{req[4]} {m.unit}）", "points": 5},
+            {"value": "lv6", "label": f"LV6 或更高（≥ {req[5]} {m.unit}）", "points": 6},
+        ]
+        questions.append({"key": m.key, "label": m.label, "unit": m.unit,
+                          "options": options})
+    return {"framework": "按你最接近的真实数值选，不看感觉；等级取最弱的一项",
+            "max_level": 6, "questions": questions}
+
+
+def custom_baseline_level(answers: dict, spec: dict) -> dict:
+    """自建技能问卷 → 起点等级（取最弱指标，最高 LV6）。"""
+    if not isinstance(answers, dict):
+        raise ValueError("问卷答案必须是对象")
+    levels, detail = [], {}
+    for q in spec["questions"]:
+        raw = answers.get(q["key"])
+        if raw is None:
+            raise ValueError(f"自评问卷缺少「{q['label']}」")
+        hit = next((o for o in q["options"] if o["value"] == raw), None)
+        if hit is None:
+            raise ValueError(f"「{q['label']}」的取值无效")
+        levels.append(int(hit["points"]))
+        detail[q["key"]] = hit["label"]
+    level = max(1, min(6, min(levels)))
+    return {"level": level, "points": sum(levels), "max_points": 6 * len(levels),
+            "max_level": 6, "framework": spec["framework"],
+            "detail": detail,
+            "why": "取最弱的一项，避免某一项拉满就抬高整体起点。"}
+
+
 def surveys_payload() -> dict:
     """两张问卷的题面。前端不再硬编码选项，改题只改后端一处。
 
@@ -832,7 +940,7 @@ def surveys_payload() -> dict:
     return {
         "ok": True,
         "baseline_max_level": BASELINE_MAX_LEVEL,
-        "baseline_by_skill": baseline_specs(),
+        "baseline_by_skill": {**baseline_specs(), **_custom_baseline_specs()},
         "baseline_default": {
             "framework": "通用自评（自建技能没有外部标准可对照）",
             "max_level": 3,
@@ -857,7 +965,13 @@ def apply_baseline(body: dict) -> dict:
     if not skill_id:
         raise ValueError("缺少 skill_id")
     answers = body.get("answers")
-    scored = baseline_level(answers, skill_id=skill_id)  # 未知/缺项取值直接拒绝
+    rule = effective_rule(skill_id)
+    if skill_id not in SKILL_IDS and rule is not None:
+        # 自建技能：按用户自己填的指标档位定起点（取最弱项）。
+        spec = custom_baseline_spec(rule)
+        scored = custom_baseline_level(answers, spec)
+    else:
+        scored = baseline_level(answers, skill_id=skill_id)  # 未知/缺项取值直接拒绝
     level = int(scored["level"])
     progress = system.apply_baseline(skill_id, level, answers=answers,
                                      now=STATE["clock"]())
@@ -1073,6 +1187,14 @@ class Handler(BaseHTTPRequestHandler):
                 if method == "POST" and path == "/api/baseline":
                     self._send(200, apply_baseline(self._read_json()))
                     return
+                if method == "GET" and path == "/api/checkpoint":
+                    qs = parse_qs(urlparse(self.path).query)
+                    sid = str((qs.get("skill_id") or [""])[0]).strip()
+                    self._send(200, checkpoint_payload_for(sid))
+                    return
+                if method == "POST" and path == "/api/checkpoint":
+                    self._send(200, submit_checkpoint(self._read_json()))
+                    return
                 if path == "/api/skills/custom" and method == "GET":
                     self._send(200, custom_skills_payload())
                     return
@@ -1081,6 +1203,9 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 if path == "/api/skills/custom/remove" and method == "POST":
                     self._send(200, remove_custom_skill(self._read_json()))
+                    return
+                if path == "/api/skills/archive" and method == "POST":
+                    self._send(200, set_skill_archived(self._read_json()))
                     return
                 if method == "GET" and path == "/api/rules":
                     self._send(200, rules_payload())

@@ -144,7 +144,8 @@ class TestBaselineApi(unittest.TestCase):
         self.assertEqual(code, 400, res)
         self.assertIn("练习记录", str(res))
 
-    def test_baseline_falls_back_for_custom_skill(self):
+    def test_custom_skill_baseline_uses_its_own_metrics(self):
+        """自建技能没有外部考试，但用户填过指标，所以问的是指标档位。"""
         code, res, _ = self.app.req(
             "/api/skills/custom/add",
             {"name": "口琴", "metrics": [{"key": "minutes", "label": "分钟",
@@ -152,11 +153,33 @@ class TestBaselineApi(unittest.TestCase):
                                           "range_high": 240}]},
             cookie=self.cookie)
         self.assertEqual(code, 200, res)
+        code, res, _ = self.app.req("/api/surveys", cookie=self.cookie)
+        self.assertEqual(code, 200, res)
+        spec = res["baseline_by_skill"]["口琴"]
+        self.assertEqual(spec["max_level"], 6)
+        self.assertEqual(spec["questions"][0]["key"], "minutes")
         code, res, _ = self.app.req(
-            "/api/baseline", {"skill_id": "口琴", "answers": GENERIC_TOP},
+            "/api/baseline", {"skill_id": "口琴", "answers": {"minutes": "lv5"}},
             cookie=self.cookie)
         self.assertEqual(code, 200, res)
-        self.assertEqual(res["baseline_result"]["level"], 3)
+        self.assertEqual(res["baseline_result"]["level"], 5)
+        # 取最弱的一项：两指标时以低者为准
+        code, res, _ = self.app.req(
+            "/api/skills/custom/add",
+            {"name": "吹口琴长音", "metrics": [
+                {"key": "seconds", "label": "长音", "unit": "秒",
+                 "range_low": 1, "range_high": 300},
+                {"key": "songs", "label": "曲目", "unit": "首",
+                 "range_low": 0, "range_high": 200}]},
+            cookie=self.cookie)
+        self.assertEqual(code, 200, res)
+        code, res, _ = self.app.req(
+            "/api/baseline",
+            {"skill_id": "吹口琴长音",
+             "answers": {"seconds": "lv6", "songs": "none"}},
+            cookie=self.cookie)
+        self.assertEqual(code, 200, res)
+        self.assertEqual(res["baseline_result"]["level"], 1)
 
 
 if __name__ == "__main__":

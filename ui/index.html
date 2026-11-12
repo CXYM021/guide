@@ -82,6 +82,9 @@
   .bar.gate > i { background: linear-gradient(90deg, #d97706, #f0b45c); }
   .skill-foot { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); }
   .skill-foot .tag-gate { color: var(--warn); font-weight: 600; }
+  .skill-missing { font-size: 10.5px; line-height: 1.6; color: var(--warn);
+    background: #fff8ec; border-left: 2px solid var(--warn); border-radius: 6px;
+    padding: 5px 8px; margin-top: 6px; }
 
   .fab { width: 100%; margin-top: 16px; border: 0; border-radius: 14px; padding: 15px;
          background: linear-gradient(135deg, #3f3a8f, #5b53c9); color: #fff;
@@ -295,7 +298,7 @@
   .qfoot { font-size: 10.5px; color: var(--muted); line-height: 1.7; margin-top: 8px;
            border-left: 2px solid var(--line); padding-left: 9px; }
 </style>
-<script>window.__PRODUCT_AUTH__ = true; window.__APP_VERSION__ = "1.0.4";</script>
+<script>window.__PRODUCT_AUTH__ = true; window.__APP_VERSION__ = "1.0.5";</script>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="icon" type="image/png" href="/icon-192.png">
@@ -314,7 +317,7 @@
       <div class="hero">
         <div class="hero-label">当 前 境 界</div>
         <div class="realm" id="top-realm">初窥门径</div>
-        <div class="hero-sub" id="hero-sub">七艺同修 · 累计 0 点</div>
+        <div class="hero-sub" id="hero-sub">七 艺同修 · 累计 0 点</div>
         <div class="hero-row">
           <div class="hero-metrics">
             <div><b id="today-xp">0</b><span>今日所得</span></div>
@@ -378,8 +381,9 @@
         </div>
       </div>
 
-      <div class="section-title"><span>今 日 主 线 · 七 艺</span><small id="skill-count">按境界排列</small></div>
+      <div class="section-title"><span id="arts-title">今 日 主 线 · 七 艺</span><small id="skill-count">按境界排列</small></div>
       <div id="skills"></div>
+      <div class="kv" id="archived-note" style="margin-top:6px"></div>
       <div class="whisper" id="milestone-note">本级里程碑：30% / 60% / 100%</div>
 
       <button class="fab" id="open-sheet">记 录 一 次 修 行</button>
@@ -405,7 +409,7 @@
       </div>
 
       <div class="section-title"><span>同 门 残 影 · 护 道</span><small id="guild-qi">宗门气运 0</small></div>
-      <div class="scope-note" style="margin-bottom:9px">本机预置档案，不是真人，也不会主动回应；护道只影响本机数据。</div>
+      <div class="scope-note" style="margin-bottom:9px">护道＝给一个「今天还没练、连胜要断」的同门留一句提醒，+30 声望；对方不是真人、不会回复，也不影响你自己的熟练度。同门按连胜天数从高到低排。</div>
       <div id="peers"></div>
 
       <div class="section-title"><span>题 签 · 传 承</span><small>须锚定真实记录</small></div>
@@ -455,6 +459,19 @@
         <div class="section-title"><span>我 的 技 能</span><small id="cs-count">0 / 20</small></div>
         <div class="hero" style="padding:13px">
           <div class="kv" id="cs-ai">-</div>
+          <details id="cs-ai-help" style="margin:6px 0">
+            <summary style="font-size:11.5px;color:var(--primary);cursor:pointer">怎么配置 AI（点开看步骤）</summary>
+            <div class="kv" style="margin-top:6px">
+              启动服务前设三个环境变量：PROF_AI_ENDPOINT（OpenAI 兼容的 chat/completions 地址）、
+              PROF_AI_KEY、PROF_AI_MODEL。Windows PowerShell 例：<br>
+              <code>$env:PROF_AI_ENDPOINT="https://api.example.com/v1/chat/completions"</code><br>
+              <code>$env:PROF_AI_KEY="sk-..."</code>
+              <code>$env:PROF_AI_MODEL="gpt-4o-mini"</code><br>
+              然后重新启动（exe 用户：在同一个 PowerShell 窗口里运行 exe）。
+              AI 只负责「把公开资料折算成等级要求」，判定仍按指标门；没配 AI 或调用失败会用本地模板，
+              并明确标注 ai_used=false，不会冒充 AI。
+            </div>
+          </details>
           <div id="cs-list" style="margin:8px 0"></div>
           <div class="hint" style="margin:8px 0 4px">新增技能：填名字与 1–5 个可观测指标（越高越好、整数）。未配置 AI 时按合法范围生成本地保守模板，不冒充 AI 判定；配置 AI 后会自动联网检索公开资料生成等级要求（也可以自己填参考网址）。</div>
           <div class="row"><label>技能名 <input id="cs-name" type="text" maxlength="24" placeholder="例：钢琴演奏"></label></div>
@@ -465,6 +482,12 @@
           <div class="kv" id="cs-error" style="color:#d93025;min-height:18px"></div>
           <button class="submit" id="cs-submit">生 成 并 添 加</button>
         </div>
+      </div>
+
+      <div class="section-title" style="margin-top:8px"><span>技 能 管 理</span><small>内置技能可归档</small></div>
+      <div class="hero" style="padding:13px">
+        <div class="kv">内置技能不删除（删了等级体系会失去参照），可以<b>归档</b>：从今日主线、推荐里隐藏，记录与等级都还在，随时恢复。自定义技能在「我的技能」里可直接删除。</div>
+        <div id="skill-mgr" style="margin-top:8px"></div>
       </div>
 
       <div class="section-title" style="margin-top:8px"><span>开 发 者 工 具</span><small>默认关闭</small></div>
@@ -586,6 +609,17 @@
       <button class="mini" id="base-later">稍 后 再 说</button>
     </div>
     <button class="submit" id="base-submit">确 认 起 点</button>
+  </div>
+
+  <div class="sheet" id="quiz-sheet">
+    <div class="grab"></div>
+    <h3>升 级 验 证 · <span id="quiz-skill">语言技能</span></h3>
+    <div class="hint" id="quiz-hint">语言类技能从 LV5 起要过这三道客观题（指标够格只说明能考）。
+      不扣经验、可以重做；答错会给出解析。</div>
+    <div id="quiz-body"></div>
+    <div class="kv" id="quiz-result"></div>
+    <button class="submit" id="quiz-submit">提 交 答 案</button>
+    <div class="quick" style="margin-top:8px"><button class="mini" id="quiz-close">稍 后 再 说</button></div>
   </div>
 
   <div class="sheet" id="settle-sheet">
@@ -784,16 +818,31 @@ function renderToday(d) {
   }
 
   renderRecommendation(d);
-  $('skills').innerHTML = d.skills.map(s => {
+  const activeSkills = d.skills.filter(s => !s.archived);
+  const nArts = activeSkills.length;
+  $('arts-title').textContent = '今 日 主 线 · ' + nArts + ' 艺';
+  $('hero-sub').textContent = nArts + ' 艺同修 · ' +
+    (d.achievement_context.sessions || 0) + ' 次有效修行';
+  $('skills').innerHTML = activeSkills.map(s => {
     const pct = s.is_max_level ? 100 : s.percent;
     // 卡级把所有未通过项一次说全，不再只显示第一条造成「只说一半」。
     const missing = s.missing || [];
     const floorTag = (s.baseline_level && s.baseline_level > s.exp_level)
       ? '<span class="tag-gate">自评起点 LV' + s.baseline_level + '</span>' : '';
     const gate = s.gate_blocked
-      ? '<span class="tag-gate">经验够 LV' + s.exp_level + ' · ' +
-          (missing.length ? esc(missing.join('；')) : '达标校验未放行') + '</span>'
+      ? '<span class="tag-gate">经验够 LV' + s.exp_level + '，达标还差 ' +
+          (missing.length ? missing.length + ' 项' : '1 项') + '</span>'
       : ((s.is_max_level ? '已至圆满' : '还差 ' + s.remaining_exp + ' 点') + floorTag);
+    const missHtml = (s.gate_blocked && missing.length)
+      ? '<div class="skill-missing">' + missing.map(x => '· ' + esc(x)).join('<br>') + '</div>'
+      : '';
+    const quizBtn = s.quiz_required
+      ? '<div style="margin-top:6px"><button class="mini pri" data-quiz="' +
+        esc(s.skill_id) + '">做升级验证（3 题）</button></div>'
+      : '';
+    const footLeft = s.gate_blocked
+      ? ('有效经验 ' + s.effective_exp + ' · 本级 ' + s.current_exp + ' / ' + s.required_exp)
+      : (s.effective_exp + ' / ' + (s.is_max_level ? 'MAX' : (s.current_exp + s.remaining_exp)));
     return '<div class="skill" data-skill="' + esc(s.skill_id) + '">' +
       '<div class="skill-top"><div><span class="skill-name">' + esc(s.skill_id) + '</span>' +
         '<span class="skill-realm">' + esc(s.realm) + '</span></div>' +
@@ -801,11 +850,19 @@ function renderToday(d) {
       '<div class="bar' + (s.gate_blocked ? ' gate' : '') + '"><i style="width:' + pct + '%"></i></div>' +
       '<div class="mile">' + [30, 60, 100].map(m =>
         '<i class="' + (pct >= m ? 'on' : '') + '"></i>').join('') + '</div>' +
-      '<div class="skill-foot"><span>' + s.effective_exp + ' / ' +
-        (s.is_max_level ? 'MAX' : (s.current_exp + s.remaining_exp)) + '</span><span>' + gate + '</span></div>' +
-      '</div>';
+      '<div class="skill-foot"><span>' + footLeft + '</span><span>' + gate + '</span></div>' +
+      missHtml + quizBtn + '</div>';
   }).join('');
-  const top = d.skills.reduce((a, b) => (b.percent > a.percent ? b : a), d.skills[0]);
+  document.querySelectorAll('[data-quiz]').forEach(b => {
+    b.onclick = () => openQuiz(b.dataset.quiz);
+  });
+  const top = activeSkills.reduce((a, b) => (b.percent > a.percent ? b : a), activeSkills[0]);
+  const archived = d.skills.filter(s => s.archived);
+  $('archived-note').innerHTML = archived.length
+    ? ('已归档 ' + archived.length + ' 个：' +
+       archived.map(x => esc(x.skill_id)).join('、') +
+       '（不参与今日主线与推荐；在「设置 → 技能管理」恢复）')
+    : '';
   $('milestone-note').textContent = top
     ? ('本级里程碑 30% / 60% / 100% · ' + top.skill_id + ' 当前 ' +
        Math.round(top.percent) + '%' + (top.fast_track ? ' · 连续达标快通已激活' : ''))
@@ -833,15 +890,16 @@ function renderWorld(w) {
   $('hero-wallet').textContent = '声望 ' + w.reputation + ' · 连胜激冻 ' +
     (wallet.freeze_cards || 0) + ' 张' + (wallet.pending_insight ? ' · 悟道卡已装备' : '');
   $('wallet').innerHTML = [
-    ['悟道卡', wallet.insight_cards || 0, '下一次有效练习翻倍'],
+    ['悟道卡', wallet.insight_cards || 0, '下一次有效练习 ×1.2'],
     ['连胜激冻', wallet.freeze_cards || 0, '断签时保一次连胜'],
     ['今日功德', w.day_reputation, '每日上限 ' + cap]
   ].map(x => '<div class="wallet-cell"><b>' + x[1] + '</b><span>' + esc(x[0]) +
     '<br>' + esc(x[2]) + '</span></div>').join('');
   $('wallet-hint').textContent = wallet.pending_insight
-    ? '悟道卡已装备：下一次有效练习熟练度翻倍，完成后自动消耗。'
+    ? '悟道卡已装备：下一次有效练习的收益 ×1.2（只放大这一次，不改已有记录），完成后自动消耗。'
     : '声望只能靠护道、题签、传承获得，不能购买。兑换：悟道卡 ' +
-      (costs.insight_card || 0) + ' 点 / 连胜激冻 ' + (costs.freeze_card || 0) + ' 点。';
+      (costs.insight_card || 0) + ' 点 / 连胜激冻 ' + (costs.freeze_card || 0) + ' 点。' +
+      '悟道卡只影响下一次练习的增益，不会改写历史记录，也不会替你跳过达标校验。';
   $('guild-qi').textContent = '宗门气运 ' + (w.guild_qi || 0);
   $('peers').innerHTML = (w.peers || []).map(p =>
     '<div class="peer' + (p.at_risk ? ' risk' : '') + '"><div>' +
@@ -1151,7 +1209,7 @@ function openSheet(skillId) {
   $('mask').classList.add('on'); $('sheet').classList.add('on');
 }
 function closeSheet() { $('mask').classList.remove('on'); $('sheet').classList.remove('on'); }
-$('mask').onclick = () => { closeSheet(); closeSettle(); closeBaseline(); };
+$('mask').onclick = () => { closeSheet(); closeSettle(); closeBaseline(); closeQuiz(); };
 
 function renderMetricInputs(skillId, boxId) {
   const rule = rulesData && rulesData.skill_rules[skillId];
@@ -1722,6 +1780,78 @@ $('data-file').onchange = async (ev) => {
 };
 $('data-backup').onclick = () => post('/api/backup', {}, '现场备份已生成');
 
+/* ---------------- 升级验证（语言类技能 LV5+） ---------------- */
+let quizData = null, quizAnswers = {}, quizSkill = '';
+async function openQuiz(sid) {
+  try {
+    quizData = await api('/api/checkpoint?skill_id=' + encodeURIComponent(sid));
+  } catch (e) { toast('读取验证题失败：' + e.message); return; }
+  quizSkill = sid;
+  quizAnswers = {};
+  $('quiz-skill').textContent = sid + ' · 目标 LV' + quizData.target_level;
+  $('quiz-result').textContent = '';
+  drawQuiz();
+  $('quiz-sheet').classList.add('on');
+  $('mask').classList.add('on');
+}
+function closeQuiz() {
+  $('quiz-sheet').classList.remove('on');
+  if (!$('sheet').classList.contains('on') && !$('settle-sheet').classList.contains('on') &&
+      !$('base-sheet').classList.contains('on')) $('mask').classList.remove('on');
+}
+function drawQuiz() {
+  const items = (quizData && quizData.items) || [];
+  $('quiz-body').innerHTML = items.map((it, i) =>
+    '<div class="qblock"><div class="qlabel">' + (i + 1) + '. ' + esc(it.stem) + '</div>' +
+    it.options.map((op, k) =>
+      '<button class="mini' + (quizAnswers[it.id] === k ? ' pri' : '') +
+      '" data-qid="' + esc(it.id) + '" data-qk="' + k + '">' + esc(op) + '</button>').join(' ') +
+    '</div>').join('');
+  document.querySelectorAll('[data-qid]').forEach(b => {
+    b.onclick = () => { quizAnswers[b.dataset.qid] = Number(b.dataset.qk); drawQuiz(); };
+  });
+}
+$('quiz-close').onclick = closeQuiz;
+$('quiz-submit').onclick = async () => {
+  if (!quizData) return;
+  const missing = quizData.items.filter(it => quizAnswers[it.id] === undefined);
+  if (missing.length) { toast('还有 ' + missing.length + ' 题没选'); return; }
+  try {
+    const res = await api('/api/checkpoint',
+      { skill_id: quizSkill, answers: quizAnswers });
+    const r = res.checkpoint_result || {};
+    $('quiz-result').innerHTML = (r.passed ? '通过 ' : '未通过 ') +
+      (r.correct || 0) + ' / ' + (r.total || 3) + '<br>' +
+      (r.detail || []).map(d => (d.correct ? '✓ ' : '✗ ') + esc(d.why)).join('<br>');
+    if (r.passed) { toast('验证通过'); setTimeout(() => { closeQuiz(); }, 1200); }
+    render(res);
+  } catch (e) { toast('提交失败：' + e.message); }
+};
+
+/* ---------------- 技能管理（归档 / 恢复） ---------------- */
+function renderSkillManager(d) {
+  const box = $('skill-mgr');
+  if (!box) return;
+  box.innerHTML = (d.skills || []).map(s =>
+    '<div class="kv" style="margin:4px 0;display:flex;justify-content:space-between;align-items:center;gap:8px">' +
+      '<span>' + esc(s.skill_id) + ' · LV' + s.level +
+        (s.archived ? ' · <span style="color:var(--warn)">已归档</span>' : '') +
+      '</span>' +
+      '<button class="mini" data-arch="' + esc(s.skill_id) + '" data-to="' +
+        (s.archived ? '0' : '1') + '">' + (s.archived ? '恢复' : '归档') + '</button>' +
+    '</div>').join('');
+  box.querySelectorAll('[data-arch]').forEach(b => {
+    b.onclick = async () => {
+      try {
+        await api('/api/skills/archive',
+                  { skill_id: b.dataset.arch, archived: b.dataset.to === '1' });
+        toast(b.dataset.to === '1' ? '已归档，可在下面恢复' : '已恢复到今日主线');
+        await refresh();
+      } catch (e) { toast('操作失败：' + e.message); }
+    };
+  });
+}
+
 /* ---------------- 我的自定义技能 ---------------- */
 function csMetricRow() {
   const box = document.createElement('div');
@@ -1821,6 +1951,7 @@ function render(d) {
   renderCapture(d);
   renderBenchmark(d);
   renderData(d);
+  renderSkillManager(d);
   const sel = [$('p-skill'), $('cfg-skill'), $('cap-skill')];
   sel.forEach(node => {
     const prev = node.value;

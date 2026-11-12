@@ -91,6 +91,7 @@ _READWRITE = {
         _q("exam", "最近一次英语读写考试（IELTS / TOEFL / CET）", (
             _o("none", "没考过", 0),
             _o("low", "IELTS 5.5 以下 / TOEFL 15 以下 / CET-4 未过", 5),
+            _o("cet4", "CET-4 已过、CET-6 还没过", 7),
             _o("mid", "IELTS 6–6.5 / TOEFL 18–22 / CET-6 通过", 10),
             _o("high", "IELTS 7–7.5 / TOEFL 23–27", 15),
             _o("top", "IELTS 8 以上 / TOEFL 28 以上", 20),
@@ -293,10 +294,10 @@ _EDITING = {
             _o("full", "全流程独立交付（含包装）", 20),
             _o("team", "带团队或定流程", 22),
         )),
-        _q("tools", "软件掌握范围", (
-            _o("capcut", "剪映类就够用", 4),
-            _o("premiere", "Premiere / Final Cut 熟练", 8),
-            _o("resolve", "达芬奇调色", 12),
+        _q("tools", "软件掌握（按你最强的一项选，不必全都用过）", (
+            _o("capcut", "剪映 / 必剪类就够用", 4),
+            _o("premiere", "Premiere 或 Final Cut 能独立剪", 8),
+            _o("resolve", "达芬奇能剪能调色（没用过 PR / FCP 也算）", 12),
             _o("ae", "After Effects 合成与动效", 14),
             _o("multi", "多软件协同，按项目选工具", 16),
         )),

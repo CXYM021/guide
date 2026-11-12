@@ -46,6 +46,10 @@ from decimal import Decimal, InvalidOperation, ROUND_CEILING, localcontext
 from pathlib import Path
 from typing import Callable, Iterator, Protocol
 
+try:  # 直接运行 engine/ 内脚本时是顶层模块；被 tests 以包形式导入时是相对导入
+    from checkpoints import quiz_level
+except ImportError:  # pragma: no cover
+    from .checkpoints import quiz_level
 from realistic_rules import (
     FEEDBACK_LEVELS, LEVEL_CRITERIA, MAX_LEVEL, REPEAT_WINDOW, SHAPE_RULES,
     STREAK_RULES, TRUST_RULES, PracticeContext, PracticeRecord, PracticeVerdict,
@@ -413,6 +417,10 @@ class SkillState:
     # _granted_level 里兜住下限，避免新用户从 LV1 重新爬一遍已会的部分。
     # 0 = 没做过自评；设置后只在没有练习记录时允许写入。
     baseline_level: int = 0
+    # 归档：从今日主线与推荐里隐藏，但保留全部记录（可随时恢复）。
+    archived: bool = False
+    # 等级验证（v8）：语言类技能 LV5 起要过一次客观小题，记下已验过的等级。
+    verified_level: int = 0
 
     def __post_init__(self) -> None:
         _require_skill_id(self.skill_id)
@@ -429,6 +437,11 @@ class SkillState:
         _require_int(self.low_streak, "low_streak", 0)
         _require_int(self.settled_at, "settled_at", 0)
         _require_int(self.baseline_level, "baseline_level", 0)
+        if not isinstance(self.archived, bool):
+            raise TypeError("archived 必须是 bool")
+        _require_int(self.verified_level, "verified_level", 0)
+        if self.verified_level and not 1 <= self.verified_level <= MAX_LEVEL:
+            raise ValueError(f"verified_level 必须在 1..{MAX_LEVEL} 或 0")
         if self.baseline_level and not 1 <= self.baseline_level <= MAX_LEVEL:
             raise ValueError(f"baseline_level 必须在 1..{MAX_LEVEL} 或 0（未自评）")
         if not isinstance(self.metric_sums, dict) or not all(
@@ -459,6 +472,8 @@ class SkillState:
             "metric_sums": dict(self.metric_sums),
             "recent_sessions": [dict(row) for row in self.recent_sessions],
             "baseline_level": self.baseline_level,
+            "archived": self.archived,
+            "verified_level": self.verified_level,
         }
 
     @staticmethod
@@ -497,6 +512,9 @@ class SkillState:
                              if isinstance(row, dict)],
             baseline_level=_require_int(data.get("baseline_level", 0),
                                         "baseline_level", 0),
+            archived=bool(data.get("archived", False)),
+            verified_level=_require_int(data.get("verified_level", 0),
+                                       "verified_level", 0),
         )
 
 
@@ -522,6 +540,9 @@ class SkillProgress:
     gate_blocked: bool = False        # True = 经验已够升级，但达标校验未放行
     assess_gate_enabled: bool = False
     baseline_level: int = 0           # 首登自评的信用等级地板（0 = 未自评）
+    archived: bool = False            # 归档后不进今日主线与推荐
+    verified_level: int = 0           # 已通过等级验证的最高目标等级
+    quiz_required: bool = False        # 下一级需要先过验证题
 
     @property
     def remaining_exp(self) -> int:
@@ -578,6 +599,9 @@ class SkillProgress:
             "gate_blocked": self.gate_blocked,
             "assess_gate_enabled": self.assess_gate_enabled,
             "baseline_level": self.baseline_level,
+            "archived": self.archived,
+            "verified_level": self.verified_level,
+            "quiz_required": self.quiz_required,
         }
 
 
@@ -1179,8 +1203,13 @@ class ProficiencySystem:
             return max(floor, exp_level)  # 未定义专属规则的技能走通用兜底
         stats = self._stats_unlocked(state, now)
         granted = start
+        need = quiz_level(skill_id)
         for target in range(start + 1, exp_level + 1):
             if not assess_skill_level(rule, target, stats, state.metric_sums)["qualified"]:
+                break
+            # 语言类技能 LV5 起要过一次客观小题：指标达标只说明「够格考」，
+            # 做题通过才算真到这一级。
+            if need and target >= need and state.verified_level < target:
                 break
             granted = target
         return max(floor, granted)
@@ -1255,6 +1284,14 @@ class ProficiencySystem:
             gate_blocked=gate_blocked,
             assess_gate_enabled=self._assess_gate,
             baseline_level=self._baseline_floor(state),
+            archived=bool(state.archived),
+            verified_level=int(state.verified_level),
+            quiz_required=bool(
+                quiz_level(skill_id)
+                and level + 1 >= quiz_level(skill_id)
+                and int(state.verified_level) < level + 1
+                and exp_level >= level + 1
+            ),
         )
 
     def _snapshot(self) -> Snapshot:
@@ -1633,6 +1670,44 @@ class ProficiencySystem:
                 note=f"自评起点 LV{level}"[:500],
                 survey=payload,
             )
+            self._mark_dirty()
+            return self._progress(skill_id, t)
+
+    def set_archived(
+        self, skill_id: str, archived: bool, *, now: int | None = None,
+    ) -> SkillProgress:
+        """归档 / 恢复一个技能（只影响展示与推荐，不动任何记录）。"""
+        skill_id = _require_skill_id(skill_id)
+        if not isinstance(archived, bool):
+            raise TypeError("archived 必须是 bool")
+        with self._lock:
+            t = self._now(now)
+            if self._ensure_skill(skill_id):
+                self._mark_dirty()
+            state = self._states[skill_id]
+            state.archived = archived
+            state.updated_at = _iso(t)
+            self._mark_dirty()
+            return self._progress(skill_id, t)
+
+    def mark_verified(self, skill_id: str, level: int, *,
+                      now: int | None = None) -> SkillProgress:
+        """记录「已通过目标等级 level 的验证题」，并重算等级。"""
+        skill_id = _require_skill_id(skill_id)
+        if isinstance(level, bool) or not isinstance(level, int):
+            raise TypeError("level 必须是整数")
+        with self._lock:
+            t = self._now(now)
+            if self._ensure_skill(skill_id):
+                self._mark_dirty()
+            state = self._states[skill_id]
+            top = self._tables[skill_id].config.max_level
+            if not 1 <= level <= top:
+                raise ValueError(f"level 必须在 1..{top}")
+            if level > int(state.verified_level):
+                state.verified_level = level
+                state.updated_at = _iso(t)
+            self._settle_unlocked(skill_id, t)
             self._mark_dirty()
             return self._progress(skill_id, t)
 

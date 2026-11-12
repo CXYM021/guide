@@ -294,7 +294,10 @@ class WorldState:
                 "不联网、没有真实社区与其他使用者。"
             ),
             "actors": actors,
-            "peers": [a for a in actors if not a["is_player"]],
+            "peers": sorted(
+                (a for a in actors if not a["is_player"]),
+                key=lambda a: (-int(a.get("streak_days") or 0), str(a.get("name") or "")),
+            ),
             "reputation": rep,
             "reputation_title": reputation_title(rep),
             "reputation_titles": reputation_title_ladder(),
