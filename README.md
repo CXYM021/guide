@@ -3,6 +3,12 @@
 [![tests](https://github.com/CXYM021/proficiency/actions/workflows/tests.yml/badge.svg)](https://github.com/CXYM021/proficiency/actions/workflows/tests.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
+**[⬇ 下载 Windows 版（免安装 exe）](https://github.com/CXYM021/proficiency/releases/latest/download/proficiency-web-win64.zip)**
+· 解压双击 `proficiency-web.exe` 就能用，不需要 Python。
+
+> 别点右上角绿色的 `Code → Download ZIP`：那是**源码**，里面没有 exe。
+> 可执行文件只放在 [Releases](https://github.com/CXYM021/proficiency/releases) 里。
+
 把「我在变强」变成可以核对的数据：七项技能、LV1–LV8、只记有效练习、停练会掉、能复测。
 
 一个可以完全跑在自己电脑上的技能熟练度账本。没有排行榜、没有金币、没有「打卡即加分」——
