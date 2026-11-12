@@ -1,5 +1,20 @@
 # 变更记录
 
+## 1.0.1
+
+只修兼容性与可移植性，判定规则与存档格式不变（SCHEMA 仍是 6）。
+
+### 修复
+
+- **Python 3.10 / 3.11 无法导入 `engine/web_app.py`**：f-string 里嵌套同种引号是
+  PEP 701 才允许的写法（3.12+），3.10/3.11 直接 `SyntaxError`，整个模块导入失败。
+  改成单引号后两个版本都能跑；这也是 CI 里 ubuntu 3.10 / 3.11 挂掉的原因。
+- **非 UTF-8 控制台下启动提示崩溃**：Windows English runner 与「输出重定向到管道/文件」
+  会按 cp1252 编码 stdout，中文 `print` 抛 `UnicodeEncodeError`，把命令整条带崩。
+  新增 `console.py`（导入即把 stdout/stderr 切到 UTF-8 + replace），所有会打印中文的
+  入口（server / frozen_entry / web_app / build_* / smoke_exe / tools/*）都先导入它。
+- CI 四格矩阵（ubuntu 3.10/3.11/3.12 + windows 3.12）全部通过。
+
 ## 1.0.0
 
 首个可公开使用的版本。

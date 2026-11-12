@@ -33,7 +33,7 @@ from auth import AuthError, AuthStore  # noqa: E402
 from tenant import TenantManager  # noqa: E402
 
 PRODUCT_NAME = "proficiency-web"
-PRODUCT_VERSION = "1.0.0"
+PRODUCT_VERSION = "1.0.1"
 
 DEFAULT_CONFIG = {
     "host": "127.0.0.1",
