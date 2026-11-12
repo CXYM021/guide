@@ -219,8 +219,13 @@ rejected; retention decays with idle time; level-ups require recent quality, at 
 objective measurement, and skill-specific metrics. Everything is self-reported (no verification),
 runs on the Python standard library, and stores data in plain files you can export.
 
-Quick start: `python server.py` → open <http://127.0.0.1:8765/> → register → take the 4-question
-baseline → log your first session. Windows users can grab the single-file exe from Releases.
+**Windows (no Python needed):** [download the single-file exe](https://github.com/CXYM021/proficiency/releases/latest/download/proficiency-web-win64.zip)
+→ unzip → double-click `proficiency-web.exe`. The green `Code → Download ZIP` button on the repo
+page gives you the *source tree*, which contains no executable: binaries are published in
+[Releases](https://github.com/CXYM021/proficiency/releases) only.
+
+Quick start from source: `python server.py` → open <http://127.0.0.1:8765/> → register → take the
+4-question baseline → log your first session.
 Deployment, backup and hardening notes live in [docs/deploy.md](docs/deploy.md); the scoring model
 is documented in [docs/architecture.md](docs/architecture.md).
 
