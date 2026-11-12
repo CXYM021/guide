@@ -1,1 +1,0 @@
-window.__PRODUCT_AUTH__ = true;
