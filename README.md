@@ -27,6 +27,9 @@
 `proficiency-web.exe`。浏览器会自动打开 `http://127.0.0.1:8765/`，注册一个账号就能用。
 不需要装 Python、不需要联网。数据和配置落在 exe 同目录的 `data/`、`config.json`。
 
+> 这个 exe 没有代码签名，Windows 第一次运行可能弹「已保护你的电脑」。点「更多信息 →
+> 仍要运行」即可；介意的话用下面的源码方式运行，行为完全一致。校验和见 Release 说明。
+
 ### 源码运行（Windows / macOS / Linux）
 
 ```bash
@@ -99,7 +102,7 @@ PROF_INVITE_CODE=你的邀请码 ./start_lan.sh     # Windows: start_lan.bat
 - **今日最优一手**：按「离升级最近 / 生疏 / 最久没练 / 最大短板」推荐下一次练什么
 - **基准复测**：同一任务隔 ≥28 天重测，只认客观度量，不写经验、不改保持度
 - **江湖（利他层）**：本机模拟的同门与互保，明确标注「非真实社区」，不假装有真人
-- **数据主权**：导出/导入、每日滚动备份（保留 14 天）、时区可切
+- **数据主权**：导出/导入、每日滚动备份（保留 14 天，长驻进程跨天也会补）、时区可切
 - **多用户**：账号 + 会话 + 每用户独立目录与锁；同一台机器上互不可见
 - **PWA**：HTTPS 下可安装到主屏（Service Worker 只缓存外壳，绝不缓存 API）
 - **开发者工具默认关闭**：推进时间、改曲线、直接加经验都要先在设置里显式打开
@@ -141,7 +144,7 @@ python tools/reset_password.py 用户名
 ## 开发
 
 ```bash
-python -m unittest discover -s tests -p "test_*.py" -v   # 60 条测试
+python -m unittest discover -s tests -p "test_*.py" -v   # 61 条测试
 python build_ui.py        # 改了 engine/web_ui.py 之后重建 ui/index.html
 python build_exe.py       # Windows 单文件 exe（需要 PyInstaller）
 ```
@@ -155,12 +158,13 @@ python build_exe.py       # Windows 单文件 exe（需要 PyInstaller）
 server.py            入口：账号会话、静态页、租户绑定、请求分发
 auth.py              账号/密码/会话（PBKDF2 + SQLite）
 tenant.py            每用户独立状态容器（LRU + 独立锁）
+custom_skills.py     每用户自定义技能账本
+skill_forge.py       升级机制生成：联网抓资料 + 可选 AI + 本地保守回退
+console.py           把控制台切到 UTF-8（Windows 非 UTF-8 代码页用）
 engine/              熟练度引擎与规则
   proficiency.py       经验/等级/保持度/事件日志/达标校验
   realistic_rules.py   规则唯一来源：阈值、系数、技能指标、问卷规格
   surveys.py           首登自评与当次问卷（纯函数）
-  custom_skills.py     每用户自定义技能账本
-  skill_forge.py       升级机制生成：联网抓资料 + 可选 AI + 本地保守回退
   data_vault.py        导出/导入/滚动备份
   benchmark.py         基准任务复测
   capture_ledger.py    挂机候选时段
@@ -168,7 +172,7 @@ engine/              熟练度引擎与规则
   web_app.py           租户化 API 内核
   web_ui.py            前端模板（真源）
 ui/index.html        构建产物，由 build_ui.py 生成，勿手改
-tests/               多用户、隔离、远控、登录、问卷、自定义技能
+tests/               多用户、隔离、远控、登录、问卷、自定义技能、每日备份
 deploy/              Caddy + docker-compose 公网部署
 tools/reset_password.py
 ```

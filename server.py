@@ -33,7 +33,20 @@ from auth import AuthError, AuthStore  # noqa: E402
 from tenant import TenantManager  # noqa: E402
 
 PRODUCT_NAME = "proficiency-web"
-PRODUCT_VERSION = "1.0.1"
+PRODUCT_VERSION = "1.0.2"
+
+# 不依赖反向代理也能拿到的安全响应头。Caddy 里还有一份更严的，
+# 但裸跑（本机 / 局域网）时这些必须由应用自己发。
+SECURITY_HEADERS = (
+    ("Referrer-Policy", "no-referrer"),
+    ("X-Frame-Options", "DENY"),
+    ("Permissions-Policy", "geolocation=(), microphone=(), camera=()"),
+    ("Content-Security-Policy",
+     "default-src 'self'; img-src 'self' data:; "
+     "style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; "
+     "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; "
+     "form-action 'self'"),
+)
 
 DEFAULT_CONFIG = {
     "host": "127.0.0.1",
@@ -140,6 +153,8 @@ class ProductHandler(web_app.Handler):
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", cache)
         self.send_header("X-Content-Type-Options", "nosniff")
+        for name, value in SECURITY_HEADERS:
+            self.send_header(name, value)
         for key, value in getattr(self, "_extra_headers", {}).items():
             self.send_header(key, value)
         self._extra_headers = {}
@@ -222,6 +237,8 @@ class ProductHandler(web_app.Handler):
             self.send_header("Content-Length", str(len(data)))
             self.send_header("Cache-Control", cache)
             self.send_header("X-Content-Type-Options", "nosniff")
+            for name, value in SECURITY_HEADERS:
+                self.send_header(name, value)
             self.end_headers()
             return None
         return self._send(200, data, ctype, cache)
@@ -277,6 +294,10 @@ class ProductHandler(web_app.Handler):
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        for name, value in SECURITY_HEADERS:
+            self.send_header(name, value)
         self.end_headers()
 
     def _auth(self, method: str, path: str) -> None:

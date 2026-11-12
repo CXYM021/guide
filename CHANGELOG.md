@@ -1,5 +1,22 @@
 # 变更记录
 
+## 1.0.2
+
+修「README 承诺与实物不符」的几处，判定规则不变（SCHEMA 仍是 6）。
+
+### 修复
+
+- **长驻进程的每日备份**：`daily_backup()` 原来只在租户第一次载入时调用，
+  进程不重启就永远只有第一天那一份。现在每个请求检查一次 UTC 日期，跨天补做
+  （同日仍只有一份，保留 14 天不变）。新增 `tests/test_daily_backup.py`。
+- **安全响应头**：应用自己补 `Referrer-Policy: no-referrer`、
+  `X-Frame-Options: DENY`、`Permissions-Policy`、`CSP`（`frame-ancestors 'none'`），
+  不再依赖反向代理——本机 / 局域网裸跑也有。
+- **可执行位**：`start.sh` / `start_lan.sh` 在 git 索引里是 100644，
+  Linux / macOS 用户 clone 后 `./start.sh` 会 Permission denied；改成 100755。
+- README：目录树把 `custom_skills.py` / `skill_forge.py` 放回仓库根、补 `console.py`，
+  测试数 60 → 61，补 Windows 未签名 exe 的 SmartScreen 提示。
+
 ## 1.0.1
 
 只修兼容性与可移植性，判定规则与存档格式不变（SCHEMA 仍是 6）。

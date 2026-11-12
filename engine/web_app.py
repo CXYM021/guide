@@ -251,6 +251,25 @@ def bootstrap_tenant(tenant: dict | None = None) -> dict:
     return t
 
 
+def ensure_daily_backup() -> str | None:
+    """长驻进程的每日备份：跨天后的第一次请求补做一次，同一天只做一次。
+
+    bootstrap_tenant 只在租户首次载入时跑；如果进程一直不重启，光靠它
+    备份会永远停在第一天。这里按「模拟时钟的 UTC 日」判断，跨天补做。
+    """
+    t = current_tenant()
+    stamp = time.strftime("%Y%m%d", time.gmtime(t["clock"]()))
+    if t.get("backup_day") == stamp:
+        return None
+    try:
+        created, _ = daily_backup(t["paths"]["data_dir"], now=t["clock"]())
+    except OSError as exc:
+        sys.stderr.write(f"[web] 每日备份失败，下次请求重试: {exc}\n")
+        return None
+    t["backup_day"] = stamp
+    return created
+
+
 STATE = _CtxProxy(None)
 SETTINGS = _CtxProxy("settings")
 DECISION_SELECTIONS = _CtxProxy("decisions")
@@ -1007,6 +1026,7 @@ class Handler(BaseHTTPRequestHandler):
         path = parsed.path
         query = parse_qs(parsed.query)
         with API_LOCK:
+            ensure_daily_backup()
             try:
                 system: ProficiencySystem = STATE["system"]
                 clock: SimClock = STATE["clock"]
