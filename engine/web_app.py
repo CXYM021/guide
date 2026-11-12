@@ -25,7 +25,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-import console  # noqa: F401,E402 - 导入即把控制台切成 UTF-8（中文提示在 cp1252 下不会崩）
+try:  # 控制台统一成 UTF-8；直接运行 engine/web_app.py 时根目录不在 sys.path
+    import console  # noqa: F401
+except ImportError:
+    pass
 
 from proficiency import (
     SCHEMA_VERSION, JsonFileStorage, PowerRule, ProficiencySystem, SkillConfig,

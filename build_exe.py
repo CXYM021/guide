@@ -22,6 +22,8 @@ import tempfile
 import zipfile
 from pathlib import Path
 
+import console  # noqa: E402,F401 - 导入即把控制台切成 UTF-8
+
 HERE = Path(__file__).resolve().parent
 DIST = HERE / "dist"
 WORK = HERE / ".build"

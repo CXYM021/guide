@@ -22,10 +22,6 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
-ENGINE_DIR = Path(__file__).resolve().parent / "engine"
-if str(ENGINE_DIR) not in sys.path:
-    sys.path.insert(0, str(ENGINE_DIR))
-
 import console  # noqa: E402,F401 - 导入即把控制台切成 UTF-8
 
 DEFAULT_CONFIG = {

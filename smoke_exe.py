@@ -27,6 +27,8 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+import console  # noqa: E402,F401 - 导入即把控制台切成 UTF-8
+
 HERE = Path(__file__).resolve().parent
 EXPECTED_ZIP_FILES = {"proficiency-web.exe", "README.txt",
                       "PYTHON-LICENSE.txt", "SHA256.txt"}

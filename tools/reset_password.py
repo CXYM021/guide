@@ -24,6 +24,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+import console  # noqa: E402,F401 - 导入即把控制台切成 UTF-8
+
 from auth import AuthError, AuthStore  # noqa: E402
 
 
