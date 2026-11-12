@@ -10,7 +10,7 @@
  *
  * Service Worker 只在 HTTPS 或 localhost 下生效；局域网 http://192.168.x.x 不会注册。
  */
-var CACHE = 'proficiency-shell-1.0.6';
+var CACHE = 'proficiency-shell-1.0.7';
 var SHELL = ['/', '/index.html'];
 var ASSETS = ['/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 

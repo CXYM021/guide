@@ -1980,12 +1980,43 @@ class MetricSpec:
             "range_low": self.range_low, "range_high": self.range_high,
             "level_requirements": list(self.level_requirements),
             "basis": self.basis, "source_ids": list(self.source_ids), "note": self.note,
+            "hint": METRIC_HINTS.get(self.key, ""),
             "aggregate": self.aggregate,
         }
 
 
 # 医学安全门字段：任何启用医学门的技能都必须提交，且必须满足安全条件。
 # 依据 Borg RPE 6–20、ACSM 运动前筛查与停止运动警示信号（见 STANDARD_SOURCES）。
+# 每个指标「怎么数」的一句话说明：界面直接展示，减少自评的随意性。
+METRIC_HINTS: dict[str, str] = {
+    "active_phrases":
+        "练前列出这次要主动用的 3 个说法；只数录音里真正说出口的个数，写在纸上背过的不算。",
+    "listener_score":
+        "让对方听完复述两点（谁做了什么、为什么）。复述出大意记 70；细节也清楚记 85 以上。"
+        "没有旁人时，隔天回放自己的录音，按同样两条判。",
+    "form_score":
+        "录一段侧面视频（≥10 秒），对照要点逐条扣：躯干稳不稳、膝盖轨迹、节奏。"
+        "60 = 动作基本标准；85 = 教练看过没有明显问题。",
+    "deliverables":
+        "按可交付成片计件数，1 件就算一次有效；等级看累计件数，不要求每次多产。",
+    "client_acceptance":
+        "按真实验收记录填：返修一次算没通过；没有客户时填内部评审通过率。",
+    "distance_meters":
+        "填这一次最长的那一段；等级看单次最好，不要求平均。",
+    "working_sets":
+        "只数「动作标准、接近力竭」的正式组。一天堆到 30 组不会更快升级——恢复也是训练的一部分。",
+    "minutes":
+        "实际专注练习的时长；热身、摆设备、刷手机不算。",
+}
+
+MEDICAL_HINT_RPE = (
+    "Borg RPE 6–20：11 = 轻松、能一直聊；13 = 有点吃力、还能说短句；"
+    "15 = 吃力、说话费劲；17 = 很吃力。超过 17 这次不计入。"
+)
+MEDICAL_HINT_STOP = (
+    "停止信号：胸痛、头晕、喘不上气、心悸、恶心。任一出现就停下，并把这一项记为 1。"
+)
+
 MEDICAL_KEYS: tuple[str, ...] = ("pain_flag", "rpe", "stop_sign")
 
 
@@ -2860,6 +2891,8 @@ def rulebook() -> dict:
         },
         "medical_gate": {
             "keys": list(MEDICAL_KEYS),
+            "rpe_hint": MEDICAL_HINT_RPE,
+            "stop_hint": MEDICAL_HINT_STOP,
             "rpe_range": [RPE_MIN, RPE_MAX],
             "rpe_vigorous": RPE_VIGOROUS,
             "rpe_reject_above": RPE_REJECT_ABOVE,
