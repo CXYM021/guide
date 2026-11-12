@@ -1,0 +1,13 @@
+data/
+**/data/
+deploy/data/
+config.json
+dist/
+.build/
+ui/app.ico
+__pycache__/
+*.pyc
+*.db
+*.db-wal
+*.db-shm
+*.log
