@@ -1,0 +1,3 @@
+# 运行仅依赖 Python 标准库（>= 3.10），无第三方包。
+# 如需在 Linux 上用 WSGI/反向代理多进程部署，请自行在代理层做会话保持；
+# 本产品自带 ThreadingHTTPServer 已支持多用户并发，不需要 gunicorn。

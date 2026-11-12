@@ -1,0 +1,28 @@
+{
+  "id": "/",
+  "name": "熟练度 · 修行录",
+  "short_name": "修行录",
+  "description": "按可观测证据记录七项技能的熟练度成长，每人一份独立存档。",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#eef0f6",
+  "theme_color": "#3f3a8f",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

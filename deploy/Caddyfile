@@ -1,0 +1,17 @@
+# 公网 HTTPS 反向代理。Caddy 自动申请并续期证书。
+# 必须设置环境变量 PROF_DOMAIN 为已解析到本机的真实域名，否则会用 localhost 内证书。
+# 不要把这个站点的 8765 端口直接对公网开放。
+{$PROF_DOMAIN:localhost} {
+	encode zstd gzip
+
+	reverse_proxy proficiency:8765 {
+		header_up X-Forwarded-Proto https
+		header_up X-Forwarded-Host {host}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+	}
+}

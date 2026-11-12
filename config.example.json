@@ -1,0 +1,12 @@
+{
+  "host": "127.0.0.1",
+  "port": 8765,
+  "data_dir": "./data",
+  "session_days": 30,
+  "default_tz_offset_seconds": 28800,
+  "max_users": 0,
+  "invite_code": "",
+  "secure_cookies": false,
+  "max_cached_tenants": 64,
+  "allowed_origins": []
+}

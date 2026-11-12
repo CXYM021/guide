@@ -1,0 +1,42 @@
+# 公网多用户部署：在 product/deploy/ 下执行
+#   PROF_DOMAIN=skill.example.com PROF_INVITE_CODE=yourcode docker compose -f docker-compose.public.yml up -d
+# 前置：域名 A/AAAA 记录已指向本机；云防火墙放行 80/443；不要放行 8765。
+services:
+  proficiency:
+    build: ..
+    image: proficiency-web:1.0
+    container_name: proficiency-web
+    restart: unless-stopped
+    expose:
+      - "8765"
+    environment:
+      PROF_HOST: "0.0.0.0"
+      PROF_PORT: "8765"
+      PROF_DATA_DIR: "/app/data"
+      PROF_SESSION_DAYS: "30"
+      PROF_TZ_OFFSET: "28800"
+      PROF_SECURE_COOKIES: "1"
+      PROF_ALLOWED_ORIGINS: "https://${PROF_DOMAIN:?set PROF_DOMAIN to your real domain}"
+      PROF_INVITE_CODE: "${PROF_INVITE_CODE:?set PROF_INVITE_CODE to limit registration}"
+    volumes:
+      - ./data:/app/data
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: proficiency-caddy
+    restart: unless-stopped
+    depends_on:
+      - proficiency
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      PROF_DOMAIN: "${PROF_DOMAIN:?set PROF_DOMAIN to your real domain}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

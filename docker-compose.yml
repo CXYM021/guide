@@ -1,0 +1,20 @@
+services:
+  proficiency:
+    build: .
+    image: proficiency-web:1.0
+    container_name: proficiency-web
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    environment:
+      PROF_HOST: "0.0.0.0"
+      PROF_PORT: "8765"
+      PROF_DATA_DIR: "/app/data"
+      PROF_SESSION_DAYS: "30"
+      PROF_TZ_OFFSET: "28800"
+      # 公网部署时把下面两项改成你的域名与邀请码，并在反向代理启用 HTTPS 后
+      # 设置 PROF_SECURE_COOKIES=1、PROF_ALLOWED_ORIGINS=https://your.domain
+      PROF_INVITE_CODE: ""
+      PROF_SECURE_COOKIES: "0"
+    volumes:
+      - ./data:/app/data
