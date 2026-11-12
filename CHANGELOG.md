@@ -1,5 +1,27 @@
 # 变更记录
 
+## 1.0.4
+
+修一个升级后才会出现的白屏级故障：**Service Worker 把旧版页面钉在缓存里**，
+旧页面向新接口要 `baseline`（1.0.3 已改成 `baseline_by_skill`），于是
+`Cannot read properties of undefined (reading 'map')`，首登问卷也不弹。
+
+### 修复
+
+- `ui/sw.js`：页面外壳改为**网络优先、离线回退**；缓存名跟着版本走
+  （`proficiency-shell-<version>` 由 `build_ui.py` 从 `server.py` 同步），
+  activate 时删掉旧版本缓存。图标与 manifest 仍走缓存优先。
+- 版本握手：页面注入 `window.__APP_VERSION__`，启动时与 `/healthz` 的
+  `version` 比对；不一致就注销 Service Worker、清掉壳缓存并重载一次
+  （同一版本只重试一次，第二次改为提示强制刷新，不会死循环）。
+- `baseQuestionsHtml` 对缺失的题库做防御，不再直接 `.map` 未定义值。
+
+### 升级提示
+
+1.0.2/1.0.3 升级到 1.0.4 时，浏览器里可能还残留旧 Service Worker：
+**升级后再刷新一次**即可自动换新；急用可 F12 → Application → Service Workers →
+Unregister，或清理该站点数据。
+
 ## 1.0.3
 
 首登问卷按技能重做：不再用一套「你觉得自己怎样」的通用题，改为每个技能

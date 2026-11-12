@@ -1294,8 +1294,9 @@ function baseSpec(skill) {
 }
 function baseQuestionsHtml(skill) {
   const spec = baseSpec(skill);
-  if (!spec) return '';
-  return spec.questions.map(q => '<div class="row"><label>' + esc(q.label) +
+  const qs = (spec && spec.questions) || [];
+  if (!qs.length) return '';
+  return qs.map(q => '<div class="row"><label>' + esc(q.label) +
     '<select data-base="' + esc(q.key) + '">' + optionHtml(q.options, '请选择') +
     '</select></label></div>').join('');
 }
@@ -1841,8 +1842,39 @@ function render(d) {
     if (!later && surveyData) { basePrompted = true; openBaseline(); }
   }
 }
+async function serverVersion() {
+  try { const h = await api('/healthz'); return String((h && h.version) || ''); }
+  catch (e) { return ''; }
+}
+async function dropShellCaches() {
+  try {
+    if (navigator.serviceWorker) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+  } catch (e) { /* 不支持或不许注销，继续清缓存 */ }
+  try { const keys = await caches.keys(); await Promise.all(keys.map(k => caches.delete(k))); }
+  catch (e) { /* 非安全上下文没有 caches */ }
+}
+async function versionGuard() {
+  const mine = window.__APP_VERSION__ || '';
+  if (!mine) return false;
+  const theirs = await serverVersion();
+  if (!theirs || theirs === mine) return false;
+  let tried = '';
+  try { tried = sessionStorage.getItem('app-version-retry') || ''; } catch (e) { /* 忽略 */ }
+  if (tried === theirs) {
+    toast('页面是旧版 ' + mine + '，服务端已升到 ' + theirs + '：请按 Ctrl+Shift+R 强制刷新');
+    return false;
+  }
+  try { sessionStorage.setItem('app-version-retry', theirs); } catch (e) { /* 忽略 */ }
+  await dropShellCaches();
+  location.reload();
+  return true;
+}
 async function refresh() {
   try {
+    if (await versionGuard()) return;
     rulesData = await api('/api/rules');
     renderRules(rulesData);
     decData = await api('/api/decisions');

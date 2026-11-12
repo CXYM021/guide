@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -33,6 +34,26 @@ PWA_HEAD = (
 )
 
 
+def product_version() -> str:
+    text = (HERE / "server.py").read_text(encoding="utf-8")
+    hit = re.search(r'PRODUCT_VERSION\s*=\s*"([^"]+)"', text)
+    if not hit:
+        raise ValueError("server.py 里找不到 PRODUCT_VERSION")
+    return hit.group(1)
+
+
+def sync_service_worker(version: str) -> bool:
+    """把 sw.js 的缓存名对齐到版本号：每次发版都换一个壳缓存，免得旧页面赖着不走。"""
+    path = HERE / "ui" / "sw.js"
+    text = path.read_text(encoding="utf-8")
+    new = re.sub(r"proficiency-shell-[0-9A-Za-z.\-]+",
+                 "proficiency-shell-" + version, text, count=1)
+    if new == text:
+        return False
+    path.write_text(new, encoding="utf-8", newline="\n")
+    return True
+
+
 def build() -> str:
     for name in ("auth_shell.html", "manifest.webmanifest", "sw.js",
                  "icon-192.png", "icon-512.png"):
@@ -47,9 +68,11 @@ def build() -> str:
         "\nif (!window.__PRODUCT_AUTH__) { refresh(); }\n</script>", 1)
     if "window.__PRODUCT_AUTH__" not in html:
         raise ValueError("HTML_PAGE 结构变化，无法注入启动保护")
+    version = product_version()
     html = html.replace(
         "</head>",
-        "<script>window.__PRODUCT_AUTH__ = true;</script>\n" + PWA_HEAD + "</head>", 1)
+        '<script>window.__PRODUCT_AUTH__ = true; window.__APP_VERSION__ = "'
+        + version + '";</script>\n' + PWA_HEAD + "</head>", 1)
     html = html.replace("</body>", shell.rstrip() + "\n</body>", 1)
     return html
 
@@ -59,7 +82,10 @@ def main() -> None:
     old = out.read_text(encoding="utf-8") if out.exists() else None
     html = build()
     out.write_text(html, encoding="utf-8")
+    sw_changed = sync_service_worker(product_version())
     status = "无变化" if old == html else "已更新"
+    if sw_changed:
+        status += "；sw.js 缓存名已对齐版本"
     print(f"{out} {status}（{len(html.encode('utf-8'))} bytes）")
 
 
