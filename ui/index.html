@@ -298,7 +298,7 @@
   .qfoot { font-size: 10.5px; color: var(--muted); line-height: 1.7; margin-top: 8px;
            border-left: 2px solid var(--line); padding-left: 9px; }
 </style>
-<script>window.__PRODUCT_AUTH__ = true; window.__APP_VERSION__ = "1.0.5";</script>
+<script>window.__PRODUCT_AUTH__ = true; window.__APP_VERSION__ = "1.0.6";</script>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="icon" type="image/png" href="/icon-192.png">
@@ -614,7 +614,7 @@
   <div class="sheet" id="quiz-sheet">
     <div class="grab"></div>
     <h3>升 级 验 证 · <span id="quiz-skill">语言技能</span></h3>
-    <div class="hint" id="quiz-hint">语言类技能从 LV5 起要过这三道客观题（指标够格只说明能考）。
+    <div class="hint" id="quiz-hint">语言类技能从 LV5 起要过验证题：每次 3 题、题目轮换，答对累计 3 题才算过；答错关掉界面，等级与经验不变。
       不扣经验、可以重做；答错会给出解析。</div>
     <div id="quiz-body"></div>
     <div class="kv" id="quiz-result"></div>
@@ -995,176 +995,36 @@ function renderRules(r) {
   rulesData = r;
   $('disclaimer').textContent = r.threshold_disclaimer || '';
   const plain = (r.plain_rules || []).map(x =>
-    '<div class="plain"><b>' + esc(x.title) + '</b><p>' + esc(x.text) + '</p>' +
-    '<code>' + esc(x.tech) + '</code></div>').join('');
-  const boundaries = table(['边界', '规则'], Object.keys(r.trigger_boundaries || {}).map(k =>
-    ['<code>' + esc(k) + '</code>', esc(r.trigger_boundaries[k])]));
-  const criteria = table(['等级', '名称', '次数', '均质', '反馈', '难度', '允许搁置', '可观测条件'],
-    (r.level_criteria || []).map(c => ['LV' + c.level, esc(c.name), c.min_sessions,
-      c.min_avg_quality, c.min_feedback, c.min_difficulty,
-      c.max_idle_days == null ? '不限' : c.max_idle_days + ' 天', esc(c.observable)]));
+    '<div class="plain"><b>' + esc(x.title) + '</b><p>' + esc(x.text) + '</p></div>').join('');
+  const steps = table(['顺序', '这一步看什么'], (r.reason_order || []).map((k, i) =>
+    [i + 1, esc((r.reason_codes || {})[k] || k)]));
+  const boundaries = table(['什么时候', '系统怎么处理'], Object.keys(r.trigger_boundaries || {}).map(k =>
+    [esc(k), esc(r.trigger_boundaries[k])]));
+  const criteria = table(['等级', '需要练多少次', '平均质量', '客观度量', '难度', '最长搁置'],
+    (r.level_criteria || []).map(c => ['LV' + c.level, c.min_sessions, '≥ ' + c.min_avg_quality,
+      '≥ ' + c.min_feedback + ' 次', c.min_difficulty,
+      c.max_idle_days == null ? '不限' : c.max_idle_days + ' 天']));
   const skillTables = Object.keys(r.skill_rules || {}).map(sid => {
     const rule = r.skill_rules[sid];
-    return '<h4 style="font-size:12px;margin:12px 0 3px">' + esc(sid) +
-      ' <span class="badge2">' + esc(rule.standard || '') + '</span></h4>' +
+    return '<h4 style="font-size:12px;margin:12px 0 3px">' + esc(sid) + '</h4>' +
       '<div class="hint">' + esc(rule.description) + '</div>' +
-      table(['指标', '单位', '有效门槛', '加成线', '合法范围', 'LV1–LV8 均值要求'],
-        rule.metrics.map(m => [esc(m.label), esc(m.unit), '≥ ' + m.min_valid, '≥ ' + m.good,
-          m.range_low + '~' + m.range_high, m.level_requirements.join(' / ')])) +
-      table(['等级', '可观测达标条件', '依据'], rule.level_observables.map((o, i) =>
-        ['LV' + (i + 1), esc(o), esc((rule.mapping_kind_by_level || {})[String(i + 1)] || '')]));
+      table(['记录什么', '单位', '低于这个不算', '做到这个才算好'],
+        rule.metrics.map(m => [esc(m.label), esc(m.unit), '≥ ' + m.min_valid, '≥ ' + m.good])) +
+      '<div class="kv">等级越高，看的是这些数字的平均值和持续程度，不是某一次填得多高。</div>';
   }).join('');
-  const sources = table(['标识', '来源与要点'], Object.keys(r.standard_sources || {}).map(k => {
-    const s = r.standard_sources[k];
-    return ['<code>' + esc(k) + '</code>', '<b>' + esc(s.name || k) + '</b>' +
-      ' <span class="badge2">' + esc(s.grade || '') + '</span>' +
-      '<div class="kv">' + esc(s.note || '') + '</div>' +
-      '<code>' + esc(s.url || '') + '</code>'];
-  }));
-  const reasons = table(['顺序', '原因码', '判定结果'], (r.reason_order || []).map((k, i) =>
-    [i + 1, '<code>' + esc(k) + '</code>', esc((r.reason_codes || {})[k] || '')]));
-  const gates = table(['顺序', '技能门'], (r.skill_metric_gate_order || []).map((k, i) =>
-    [i + 1, '<code>' + esc(k) + '</code>']));
-  const decay = table(['搁置天数', '保持度上限'], (r.decay_anchors || []).map(a =>
-    [a.days + ' 天', a.retention_bps + ' bps']));
-  const formula = table(['量', '公式'], Object.keys(r.formula || {}).map(k =>
-    ['<code>' + esc(k) + '</code>', '<code>' + esc(r.formula[k]) + '</code>']));
-  const constRows = [['质量门槛', 'Q < ' + r.constants.MIN_QUALITY + ' 判无效'],
-    ['无反馈质量门槛', 'Q < ' + r.constants.NO_FEEDBACK_QUALITY_GATE],
-    ['连续低难度', '第 ' + r.constants.LOW_STREAK_LIMIT + ' 次起判无效'],
-    ['重复窗口', r.constants.REPEAT_WINDOW + ' 次'],
-    ['宽限期', r.constants.DECAY_GRACE_SECONDS + ' 秒'],
-    ['保持度下限', r.constants.RETENTION_FLOOR_BPS + ' bps'],
-    ['优秀线加成', '每项 +' + (r.constants.GOOD_BONUS_BPS / 100) + '%']];
-  const streak = table(['连胜规则', '值'], Object.keys(r.streak_rules || {}).map(k =>
-    [esc(k), esc(String(r.streak_rules[k]))]));
-  const achDef = table(['成就', '条件', '目标'], (r.achievements || []).map(a =>
-    [esc(a.name) + '<br><span class="t">' + esc(a.desc) + '</span>',
-      '<code>' + esc(a.metric) + '</code>', a.target]));
-  const checks = (r.article_fact_checks || []).map(c =>
-    '<div class="plain"><b>' + esc(c.claim) + '</b><p><span class="note-bad">' +
-    esc(c.verdict) + '</span> · ' + esc(c.evidence) + '</p><p>处理：' + esc(c.action) + '</p></div>').join('');
-  const u = r.ulives_reference || {};
-  const ulives = '<div class="hint">' + esc(u.product || '') + '</div>' +
-    table(['已借鉴', '本系统对应'], (u.adopted || []).map(a => [esc(a.mechanism), esc(a.here)])) +
-    table(['未采纳', '理由'], (u.not_adopted || []).map(a => [esc(a.mechanism), esc(a.reason)])) +
-    '<div class="hint">来源：' + (u.sources || []).map(s => '<code>' + esc(s) + '</code>').join(' ') + '</div>';
-  const decided = table(['决策', '选定', '实施结果'], (r.open_decisions || []).map(d =>
-    [esc(d.question), '<code>' + esc(d.selected) + '</code>', esc(d.implementation)]));
-  const verification = (r.source_verification || []).map(c =>
-    '<div class="plain"><b>[' + esc(c.layer) + '] ' + esc(c.claim) + '</b>' +
-    '<p><span class="note-bad">' + esc(c.verdict) + '</span> · ' + esc(c.evidence) +
-    '</p><p>处理：' + esc(c.action) + '</p></div>').join('');
-  const t = r.trust_rules || {}, n = r.narrative_rules || {}, a = r.altruism_rules || {};
-  const punish = n.punishment_policy || {};
-  const threeLayers =
-    '<div class="hint"><b>验证层</b> ' + esc(t.declaration || '') + '</div>' +
-    table(['证明类型取值', '说明'], Object.keys(t.proof_type_labels || {}).map(k =>
-      ['<code>' + esc(k || '（空）') + '</code>', esc(t.proof_type_labels[k])])) +
-    '<div class="kv">已实现真实校验：<b>' + (t.verification_implemented ? '是' : '否') +
-      '</b> · 本机不接收图片、不下载链接、不校验真伪。</div>' +
-    '<div class="hint" style="margin-top:10px"><b>叙事层</b> ' +
-      esc(n.push_capability || '') + '。' + esc(n.no_unverified_metrics || '') + '</div>' +
-    table(['惩罚政策', '取值'], Object.keys(punish).map(k =>
-      [esc(k), esc(Array.isArray(punish[k]) ? punish[k].join(' / ') : String(punish[k]))])) +
-    '<div class="hint" style="margin-top:10px"><b>利他层</b> 声望汇率与门槛是本机自定参数，' +
-      '「GP-AIR」查无此框架名；机制只借间接互惠的思路。</div>' +
-    table(['利他行为', '声望'], Object.keys(a.reputation || {}).map(k =>
-      [esc(k), a.reputation[k]])) +
-    table(['兑换项', '所需声望'], Object.keys(a.exchange_cost || {}).map(k =>
-      [esc(k), a.exchange_cost[k]])) +
-    table(['声望称号', '门槛'], (r.reputation_titles || []).map(x =>
-      [esc(x.name), x.min]));
-  const diag = (r.diagnosis_verification || []).map(c =>
-    '<div class="plain"><b>' + esc(c.claim) + '</b><p><span class="note-bad">' +
-    esc(c.verdict) + '</span> · ' + esc(c.evidence) + '</p><p>处理：' +
-    esc(c.action) + '</p></div>').join('');
-  const sr = r.shape_rules || {};
-  const shapeTable = table(['形状参数', '值'], Object.keys(sr)
-    .filter(k => k !== 'disclaimer').map(k =>
-      [esc(k), esc(typeof sr[k] === 'object' ? JSON.stringify(sr[k]) : String(sr[k]))])) +
-    '<div class="hint">' + esc(sr.disclaimer || '') + '</div>';
-
-  const lf = r.low_friction || {};
-  const capVerify = (r.capability_verification || []).map(c =>
-    '<div class="plain"><b>' + esc(c.claim) + '</b><p><span class="note-bad">' +
-    esc(c.verdict) + '</span> · ' + esc(c.source) + '</p><p>' + esc(c.note) + '</p>' +
-    (c.url ? '<code>' + esc(c.url) + '</code>' : '') + '</div>').join('');
-  const lowFriction = (lf.plain || []).map(x =>
-    '<div class="plain"><p>' + esc(x) + '</p></div>').join('') +
-    table(['参数', '值'], Object.keys(lf)
-      .filter(k => k !== 'plain' && k !== 'not_implemented').map(k =>
-      ['<code>' + esc(k) + '</code>',
-        esc(typeof lf[k] === 'object' ? JSON.stringify(lf[k]) : String(lf[k]))])) +
-    '<div class="hint">明确未实现：' +
-    (lf.not_implemented || []).map(x => esc(x)).join(' / ') + '</div>' +
-    '<h4 style="font-size:12px;margin:12px 0 4px">能力边界 · 反向核实（' +
-    (r.capability_verification || []).length + ' 条）</h4>' + capVerify;
-  const fm = r.settlement_form_meta || {};
-  const settleBook = r.settlement_forms || {};
-  const settleTable = '<div class="hint">' + esc(fm.disclaimer || '') + '</div>' +
-    table(['问卷里的项', '对应判定字段'], Object.keys(fm.field_map || {}).map(k =>
-      [esc(k), esc(fm.field_map[k])])) +
-    '<div class="hint">' + esc(fm.difficulty_hint || '') + '</div>' +
-    Object.keys(settleBook).map(sid => {
-      const f = settleBook[sid];
-      return '<h4 style="font-size:12px;margin:13px 0 3px">' + esc(sid) +
-        ' <span class="badge2">' + f.question_count + ' 题</span></h4>' +
-        '<div class="hint">' + esc(f.intro || '') + '</div>' +
-        table(['问题', '默认', '可选档位'], (f.questions || []).map(q =>
-          [esc(q.label), '<code>' + esc(String(q.default)) + '</code>',
-            (q.options || []).map(o => esc(o.label)).join(' / ') ||
-            esc(q.placeholder || '自由填写')]));
-    }).join('');
-
-  const defs = r.proficiency_definition || {};
-  const defTable = '<div class="hint">' + esc(defs.what_it_is || '') + '</div>' +
-    table(['项', '定义'], Object.keys(defs.three_layers || {}).map(k =>
-      ['<code>' + esc(k) + '</code>', esc(defs.three_layers[k])])) +
-    table(['分级 / 成长', '规则'], [
-      ['分级', esc((defs.grading || {}).range || '')],
-      ['升级成本', esc((defs.grading || {}).cost || '')],
-      ['达标门槛', esc((defs.grading || {}).gate || '')],
-      ['退化', esc((defs.grading || {}).downgrade || '')],
-      ['唯一入口', esc((defs.growth || {}).entry || '')],
-      ['增益公式', '<code>' + esc((defs.growth || {}).gain || '') + '</code>'],
-      ['判定顺序', esc(((defs.growth || {}).gate_order || []).join(' → '))],
-      ['无效练习', esc((defs.growth || {}).invalid || '')],
-      ['日历口径', esc((defs.growth || {}).daily_rule || '')]
-    ]) +
-    '<h4 style="font-size:12px;margin:12px 0 4px">熟练度不是什么</h4>' +
-    (defs.what_it_is_not || []).map(x => '<div class="plain"><p>' + esc(x) + '</p></div>').join('') +
-    '<h4 style="font-size:12px;margin:12px 0 4px">恒等式与自检</h4>' +
-    (defs.invariants || []).map(x => '<div class="kv">· ' + esc(x) + '</div>').join('') +
-    '<div class="hint">' + esc(defs.disclaimer || '') + '</div>';
-  const reviewRows = (r.review_verification || []).map(c =>
-    '<div class="plain"><b>' + esc(c.claim) + '</b><p><span class="' +
-    (String(c.verdict).indexOf('不') === 0 ? 'note-bad' : 'note-ok') + '">' +
-    esc(c.verdict) + '</span> · ' + esc(c.evidence) + '</p><p>处理：' +
-    esc(c.action) + '</p></div>').join('');
-
+  const levels = table(['等级', '大致是什么水平'], (r.level_criteria || []).map(c => ['LV' + c.level,
+    esc(c.observable || '')]));
+  const quiz = '<div class="kv">· 英语口语 / 英语读写 / 西班牙语从 LV5 起要做验证题。' +
+    '<br>· 每次只出 3 题，答错就关掉，等级和经验都不变；<br>' +
+    '· 再完成一次有效练习后，才会出新的 3 题（题目不会重复）；<br>' +
+    '· 累计答对 3 题才升到这一级。</div>';
   $('rule-box').innerHTML =
-    fold('熟练度是什么 · 分级与成长规则', defTable, true) +
-    fold('一句话读懂（大白话 ' + (r.plain_rules || []).length + ' 条）', plain) +
-    fold('本轮审查的反向核实（' + (r.review_verification || []).length + ' 条）', reviewRows) +
-    fold('低摩擦挂机 · 技能结算问卷（含 ' +
-      (r.capability_verification || []).length + ' 条能力核实）', lowFriction) +
-    fold('七个技能各自的结算问卷 · 与判定字段一一对应', settleTable) +
-    fold('升级 · 退化 · 卡级边界', boundaries) +
-    fold('每次熟练度增加的判定顺序', gates + reasons) +
-    fold('系数与阈值', table(['项', '值'], constRows) + decay) +
-    fold('LV1–LV8 通用达标条件', criteria) +
-    fold('七个技能各自的评判标准', skillTables) +
-    fold('连胜规则与自动成就', streak + achDef) +
-    fold('权威标准来源', sources) +
-    fold('已拍板并生效的 12 项决策', decided) +
-    fold('诊断修正：反向核实（' + (r.diagnosis_verification || []).length + ' 条）', diag) +
-    fold('形状修正参数（可回退 / 不含随机与惩罚）', shapeTable) +
-    fold('本轮三层意见的反向核实（' + (r.source_verification || []).length + ' 条）', verification) +
-    fold('验证 · 叙事 · 利他 三层规则', threeLayers) +
-    fold('参考文章的反向核实（不照抄数字）', checks) +
-    fold('参考 ulives 的机制对照', ulives) +
-    fold('计算公式', formula);
+    fold('一句话读懂（' + (r.plain_rules || []).length + ' 条）', plain, true) +
+    fold('一次练习算不算数，按这个顺序看', steps + boundaries) +
+    fold('升到下一级要满足什么', criteria + '<div class="kv">四条同时满足，缺一条就停在原地——界面会写清缺哪条。</div>') +
+    fold('技能等级验证题（LV5 起）', quiz) +
+    fold('七个技能各自记录什么', skillTables) +
+    fold('八级大致水平', levels);
 }
 
 /* ---------------- 拍板记录（设置页） ---------------- */
@@ -1788,7 +1648,8 @@ async function openQuiz(sid) {
   } catch (e) { toast('读取验证题失败：' + e.message); return; }
   quizSkill = sid;
   quizAnswers = {};
-  $('quiz-skill').textContent = sid + ' · 目标 LV' + quizData.target_level;
+  $('quiz-skill').textContent = sid + ' · 目标 LV' + quizData.target_level +
+    ' · 已答对 ' + (quizData.credit || 0) + '/' + (quizData.credits_needed || 3);
   $('quiz-result').textContent = '';
   drawQuiz();
   $('quiz-sheet').classList.add('on');
@@ -1820,12 +1681,18 @@ $('quiz-submit').onclick = async () => {
     const res = await api('/api/checkpoint',
       { skill_id: quizSkill, answers: quizAnswers });
     const r = res.checkpoint_result || {};
-    $('quiz-result').innerHTML = (r.passed ? '通过 ' : '未通过 ') +
-      (r.correct || 0) + ' / ' + (r.total || 3) + '<br>' +
-      (r.detail || []).map(d => (d.correct ? '✓ ' : '✗ ') + esc(d.why)).join('<br>');
-    if (r.passed) { toast('验证通过'); setTimeout(() => { closeQuiz(); }, 1200); }
-    render(res);
-  } catch (e) { toast('提交失败：' + e.message); }
+    if (r.passed) {
+      toast('验证通过 · 累计答对 ' + (r.credits_needed || 3) + ' 题');
+      render(res);
+      setTimeout(() => { closeQuiz(); }, 900);
+    } else {
+      // 答错：界面直接消失，等级与经验都不变；下一次有效练习后才再出题。
+      render(res);
+      closeQuiz();
+      toast('答对 ' + (r.correct || 0) + ' 题，累计 ' + (r.credit || 0) + '/' +
+            (r.credits_needed || 3) + ' · 等级不变，下次练完再出题');
+    }
+  } catch (e) { toast('提交失败：' + e.message); closeQuiz(); }
 };
 
 /* ---------------- 技能管理（归档 / 恢复） ---------------- */

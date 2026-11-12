@@ -33,7 +33,7 @@ from auth import AuthError, AuthStore  # noqa: E402
 from tenant import TenantManager  # noqa: E402
 
 PRODUCT_NAME = "proficiency-web"
-PRODUCT_VERSION = "1.0.5"
+PRODUCT_VERSION = "1.0.6"
 
 # 不依赖反向代理也能拿到的安全响应头。Caddy 里还有一份更严的，
 # 但裸跑（本机 / 局域网）时这些必须由应用自己发。

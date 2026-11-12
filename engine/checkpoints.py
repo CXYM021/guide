@@ -6,7 +6,9 @@
 
 规则：
   - 目标等级 ≥ QUIZ_MIN_LEVEL 才要求验证（LV5 起），LV1–LV4 不受影响；
-  - 三道题全对才算过，答错可以重做，不扣经验、不写负分；
+  - 每次只出 3 题，题目在题库里轮换，不会连着出同一套；
+  - 答错就关掉，等级与经验都不变，直到下一次有效练习后才再出题；
+  - 答对的题累计，累计满 3 题才升到这一级（答错不扣、也不清零）；
   - 通过后记 verified_level，下一次升级再验一次。
 纯数据 + 纯函数，没有 IO。
 """
@@ -14,6 +16,8 @@
 from __future__ import annotations
 
 QUIZ_MIN_LEVEL = 5
+QUIZ_CREDITS_TO_PASS = 3      # 累计答对 3 题才算过
+QUIZ_ITEMS_PER_ATTEMPT = 3    # 每次只出 3 题
 PASS_RATIO_NUM, PASS_RATIO_DEN = 3, 3
 
 _BANKS: dict[str, dict] = {
@@ -40,6 +44,27 @@ _BANKS: dict[str, dict] = {
                 "options": ("exclusive", "exclusion", "excluded", "excluding"),
                 "answer": 0,
                 "why": "mutually exclusive 是固定搭配，表示「互斥」。",
+            },
+            {
+                "id": "rw4",
+                "stem": "It is essential that every applicant ___ the form before Friday.",
+                "options": ("submits", "submit", "submitted", "will submit"),
+                "answer": 1,
+                "why": "It is essential that 后接虚拟语气，动词用原形 submit。",
+            },
+            {
+                "id": "rw5",
+                "stem": "The number of applicants ___ risen sharply this year.",
+                "options": ("have", "has", "were", "are"),
+                "answer": 1,
+                "why": "主语中心词是 the number（单数），谓语用 has；a number of 才跟复数。",
+            },
+            {
+                "id": "rw6",
+                "stem": "___ hard he tried, he could not meet the deadline.",
+                "options": ("However", "Whatever", "Whenever", "Wherever"),
+                "answer": 0,
+                "why": "However + 形容词/副词 + 主语 + 谓语，表示「无论多么…」。",
             },
         ),
     },
@@ -70,6 +95,32 @@ _BANKS: dict[str, dict] = {
                 "answer": 1,
                 "why": "want to 在口语里弱化为 wanna，重音落在 want 与 go 上。",
             },
+            {
+                "id": "sp4",
+                "stem": "连读里最自然的是哪一句？",
+                "options": ("an apple → /ən ˈæpl/（n 与 a 连上）",
+                            "an apple → 两个词之间明显停顿",
+                            "an apple → 把 an 读成 /eɪn/",
+                            "an apple → 重读 an"),
+                "answer": 0,
+                "why": "辅音结尾 + 元音开头要连读，an apple 听起来像 a-napple。",
+            },
+            {
+                "id": "sp5",
+                "stem": "句子的信息重音通常落在哪里？",
+                "options": ("每个词都重读", "最后一个实词或对比焦点",
+                            "所有虚词上", "句首第一个词"),
+                "answer": 1,
+                "why": "英语是重音计时语言，核心信息落在最后实词或对比焦点，虚词弱读。",
+            },
+            {
+                "id": "sp6",
+                "stem": "comfortable 日常口语里通常读几个音节？",
+                "options": ("3 个（COMF-ta-ble）", "4 个（com-for-ta-ble）",
+                            "5 个", "2 个"),
+                "answer": 0,
+                "why": "口语里常压缩成 3 个音节 /ˈkʌmftəbl/，写出来是 4 个音节。",
+            },
         ),
     },
     "西班牙语": {
@@ -96,6 +147,27 @@ _BANKS: dict[str, dict] = {
                 "answer": 0,
                 "why": "gustar 后接不定式作主语：me gusta escuchar…。",
             },
+            {
+                "id": "es4",
+                "stem": "María ___ en Madrid desde 2019.",
+                "options": ("vive", "está viviendo", "vivió", "vivía"),
+                "answer": 0,
+                "why": "desde + 时间点表示从过去持续到现在，用现在时 vive。",
+            },
+            {
+                "id": "es5",
+                "stem": "Este regalo es ___ ti.",
+                "options": ("por", "para", "de", "en"),
+                "answer": 1,
+                "why": "para 表示目的地/受益者；por 多表示原因、交换、经由。",
+            },
+            {
+                "id": "es6",
+                "stem": "Cuando era niño, ___ al parque todos los días.",
+                "options": ("fui", "iba", "voy", "iré"),
+                "answer": 1,
+                "why": "过去的习惯性动作用未完成过去时 iba。",
+            },
         ),
     },
 }
@@ -120,6 +192,7 @@ def spec(skill_id: str) -> dict | None:
         "framework": bank["framework"],
         "min_level": QUIZ_MIN_LEVEL,
         "pass_needed": PASS_RATIO_NUM,
+        "credits_needed": QUIZ_CREDITS_TO_PASS,
         "items": [{"id": it["id"], "stem": it["stem"],
                    "options": list(it["options"])} for it in bank["items"]],
     }
@@ -155,3 +228,40 @@ def grade(skill_id: str, answers: dict) -> dict:
         "detail": detail,
         "framework": bank["framework"],
     }
+
+def pick(skill_id: str, seen=(), limit: int = QUIZ_ITEMS_PER_ATTEMPT) -> list[dict]:
+    """挑这一轮要出的题：优先没见过的，题库轮完再从头开始。不含答案。"""
+    bank = _BANKS.get(skill_id)
+    if bank is None:
+        return []
+    used = [str(x) for x in (seen or [])]
+    items = list(bank["items"])
+    fresh = [it for it in items if it["id"] not in used]
+    if len(fresh) < limit:
+        # 题库轮完了：允许重复，但把「刚答对的」放到最后
+        fresh = fresh + [it for it in items if it["id"] in used]
+    return [{"id": it["id"], "stem": it["stem"], "options": list(it["options"])}
+            for it in fresh[:limit]]
+
+
+def grade_answers(skill_id: str, answers: dict) -> dict:
+    """判这一轮的题：返回正确数与逐题结果（含解析），不判定是否升级。"""
+    bank = _BANKS.get(skill_id)
+    if bank is None:
+        raise ValueError("该技能没有等级验证题")
+    if not isinstance(answers, dict):
+        raise ValueError("答案必须是对象")
+    by_id = {it["id"]: it for it in bank["items"]}
+    detail, right = [], []
+    for qid, raw in answers.items():
+        it = by_id.get(str(qid))
+        if it is None:
+            continue
+        ok = isinstance(raw, int) and not isinstance(raw, bool) and raw == it["answer"]
+        if ok:
+            right.append(it["id"])
+        detail.append({"id": it["id"], "correct": ok,
+                       "answer": it["answer"], "why": it["why"]})
+    return {"ok": True, "skill_id": skill_id, "correct": len(right),
+            "answered": len(detail), "correct_ids": right, "detail": detail,
+            "framework": bank["framework"]}

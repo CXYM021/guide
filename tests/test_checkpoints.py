@@ -41,22 +41,30 @@ class TestQuizBanks(unittest.TestCase):
 
     def test_spec_hides_answers(self):
         spec = checkpoints.spec("英语读写")
-        self.assertEqual(len(spec["items"]), 3)
+        self.assertEqual(len(spec["items"]), 6)
         for item in spec["items"]:
             self.assertNotIn("answer", item)
             self.assertNotIn("why", item)
             self.assertGreaterEqual(len(item["options"]), 3)
 
-    def test_grade_requires_every_answer(self):
-        right = _answers("西班牙语")
-        self.assertTrue(checkpoints.grade("西班牙语", right)["passed"])
-        partial = dict(right)
-        partial.pop(next(iter(partial)))
-        self.assertFalse(checkpoints.grade("西班牙语", partial)["passed"])
-        wrong = {k: (v + 1) % 4 for k, v in right.items()}
-        got = checkpoints.grade("西班牙语", wrong)
-        self.assertFalse(got["passed"])
-        self.assertEqual(got["correct"], 0)
+    def test_each_attempt_gets_three_unseen_questions(self):
+        first = [q["id"] for q in checkpoints.pick("英语读写")]
+        self.assertEqual(len(first), 3)
+        second = [q["id"] for q in checkpoints.pick("英语读写", first)]
+        self.assertEqual(len(second), 3)
+        self.assertFalse(set(first) & set(second), "两轮题目不该重复")
+
+    def test_grade_counts_only_answered_questions(self):
+        three = [q for q in checkpoints._BANKS["西班牙语"]["items"][:3]]
+        answers = {q["id"]: q["answer"] for q in three}
+        got = checkpoints.grade_answers("西班牙语", answers)
+        self.assertEqual(got["correct"], 3)
+        answered_one = {three[0]["id"]: three[0]["answer"]}
+        got = checkpoints.grade_answers("西班牙语", answered_one)
+        self.assertEqual(got["correct"], 1)
+        self.assertEqual(got["answered"], 1)
+        wrong = {q["id"]: (q["answer"] + 1) % 4 for q in three}
+        self.assertEqual(checkpoints.grade_answers("西班牙语", wrong)["correct"], 0)
 
 
 class TestQuizGate(unittest.TestCase):
@@ -85,6 +93,45 @@ class TestQuizGate(unittest.TestCase):
         self.assertEqual(system._granted_level("英语口语", state, system._now(None)), 5)  # noqa: SLF001
         state.verified_level = 6
         self.assertEqual(system._granted_level("英语口语", state, system._now(None)), 6)  # noqa: SLF001
+
+
+    def test_quiz_credits_accumulate_across_attempts(self):
+        system, state = self._system()
+        state.quiz_retry_after = -1          # 允许立刻答题（单元测试绕开「再练一次」）
+        first = system.record_quiz("英语口语", ["sp1", "sp2"])   # 2 题
+        self.assertFalse(first["passed"])
+        self.assertEqual(first["credit"], 2)
+        # 答错后必须再练一次才会重新出题
+        self.assertGreater(state.quiz_retry_after, 0)
+        self.assertFalse(system.list_progress(now=system._now(None))["英语口语"].quiz_required)  # noqa: SLF001
+        # 再练一次后放行，继续累计第 3 题 → 通过并记 verified_level
+        system.add_practice(
+            "英语口语", difficulty=4, quality=85, feedback="measured",
+            task_key="again", metrics={"continuous_minutes": 45,
+                                       "active_phrases": 32,
+                                       "listener_score": 96})
+        second = system.record_quiz("英语口语", ["sp3"])
+        self.assertTrue(second["passed"])
+        self.assertEqual(state.verified_level, 6)
+        self.assertEqual(state.quiz_credit, 0)
+
+    def test_wrong_answers_do_not_change_level_or_exp(self):
+        system, state = self._system()
+        state.quiz_retry_after = -1
+        before = (state.total_exp, state.level)
+        out = system.record_quiz("英语口语", [])
+        self.assertFalse(out["passed"])
+        self.assertEqual((state.total_exp, state.level), before)
+        self.assertTrue(state.quiz_seen == [])
+
+    def test_seen_questions_rotate_even_when_all_wrong(self):
+        """答错的题也要记进 seen，否则下次还是同一套题。"""
+        system, state = self._system()
+        state.quiz_retry_after = -1
+        system.record_quiz("英语口语", [], attempted_ids=["sp1", "sp2", "sp3"])
+        self.assertEqual(state.quiz_seen, ["sp1", "sp2", "sp3"])
+        picked = checkpoints.pick("英语口语", seen=system.quiz_seen_ids("英语口语"))
+        self.assertFalse({q["id"] for q in picked} & {"sp1", "sp2", "sp3"})
 
     def test_non_language_skill_is_not_gated(self):
         from engine.checkpoints import quiz_level

@@ -158,7 +158,7 @@ Application → Service Workers → Unregister，或清除该站点数据后重�
 ## 开发
 
 ```bash
-python -m unittest discover -s tests -p "test_*.py" -v   # 61 条测试
+python -m unittest discover -s tests -p "test_*.py" -v   # 88 条测试
 python build_ui.py        # 改了 engine/web_ui.py 之后重建 ui/index.html
 python build_exe.py       # Windows 单文件 exe（需要 PyInstaller）
 ```

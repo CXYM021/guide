@@ -55,7 +55,7 @@ __all__ = [
     "streak_bonus_bps", "advance_streak", "rebuild_streak",
     "TZ_OFFSET_MIN", "TZ_OFFSET_MAX", "validate_tz_offset",
     "REALM_TITLES", "ACHIEVEMENTS", "evaluate_achievements",
-    "ULIVES_REFERENCE", "SOURCE_VERIFICATION", "TRUST_RULES",
+    "SOURCE_VERIFICATION", "TRUST_RULES",
     "NARRATIVE_RULES", "ALTRUISM_RULES", "REPUTATION_TITLES",
     "ALTRUISM_REASON_CODES", "SHAPE_RULES", "DIAGNOSIS_VERIFICATION",
     "window_summary", "quick_pass",
@@ -352,7 +352,7 @@ def rebuild_streak(events, *, tz_offset_seconds: int = 0,
 
 
 # --------------------------------------------------------------------------
-# 网文式境界称号（ulives「自定义等级名称」机制）
+# 网文式境界称号（纯展示：给等级一个更好记的名字）
 # 纯展示文案，不参与任何判定；官方等级名仍是 LEVEL_CRITERIA.name（对齐 EQF）。
 # --------------------------------------------------------------------------
 REALM_TITLES: tuple[str, ...] = (
@@ -366,8 +366,8 @@ def realm_title(level: int) -> str:
     return REALM_TITLES[idx]
 
 
-# 自动成就（参考 ulives 的「自动/周期型成就」形态）。
-# 阈值全部是本系统自定的 MVP 参数，不是 ulives 的真实配置，也不是任何标准。
+# 自动成就：由事件日志与连胜状态纯函数判定。
+# 阈值全部是本系统自定的参数，不照搬任何外部产品。
 ACHIEVEMENTS: tuple[dict, ...] = (
     {"id": "first_step", "name": "初入江湖", "desc": "完成第 1 次有效练习",
      "metric": "sessions", "target": 1, "icon": "一"},
@@ -416,75 +416,6 @@ def evaluate_achievements(context: dict) -> list[dict]:
     return rows
 
 
-# 参考 ulives（LifeUp 团队《人升》2.0）后的机制对照。来源是本次联网实抓的
-# 官方站点与 App Store 描述；未采纳项如实写出理由，不假装已经实现。
-ULIVES_REFERENCE: dict = {
-    "product": "ulives（读作 you-lives），LifeUp 团队核心成员开发的跨平台游戏化待办 / 习惯 App，亦称《人升》2.0",
-    "sources": [
-        "https://app.ulives.io/",
-        "https://ulives.lifeupapp.net/zh-Hans/",
-        "https://apps.apple.com/cn/app/id6743084261",
-        "https://ulives.io",
-    ],
-    "adopted": [
-        {"mechanism": "自定义属性 / 技能，完成即获 XP 并升级",
-         "here": "7 个技能各自独立累计与等级，等级由经验派生"},
-        {"mechanism": "自定义等级名称",
-         "here": "新增 8 个网文式境界称号（纯展示文案，不参与判定）"},
-        {"mechanism": "自动成就 / 连续打卡成就，进度可视化",
-         "here": "9 个自动成就，由事件日志与连胜状态纯函数判定"},
-        {"mechanism": "活动日志时间轴",
-         "here": "append-only 事件日志，可回溯、可核对 sum(delta)=total_exp"},
-        {"mechanism": "统计与进度可视化",
-         "here": "近 7 / 30 日 XP 趋势、技能分布、连胜与宽限状态"},
-        {"mechanism": "本地优先、离线可用",
-         "here": "本地 JSON / SQLite 存档，服务只绑 127.0.0.1，不联网"},
-    ],
-    "not_adopted": [
-        {"mechanism": "金币、奖励商店、战利品箱（自定义概率）",
-         "reason": "会引入第二套货币与随机奖励，和本系统「数据可复现、不随机」的判定原则冲突"},
-        {"mechanism": "番茄钟 / 专注计时联动奖励",
-         "reason": "需要计时器与前台常驻，超出当前本地网页服务范围"},
-        {"mechanism": "多配置档（profiles）",
-         "reason": "当前按单实例单存档设计；多档需要改造存储主键"},
-        {"mechanism": "任务 / 子任务 / 重复提醒",
-         "reason": "本系统记录「完成事件」而非管理待办清单，避免变成第二个 To-do App"},
-    ],
-}
-
-
-# 对参考文章的反向核实结果。机制可借鉴，数字不可照抄；网页同源导出。
-ARTICLE_FACT_CHECKS: tuple[dict, ...] = (
-    {
-        "claim": "XP_for_level(N) = floor(1000 * N^1.5)，5 级约 2236、10 级约 3162",
-        "verdict": "公式与数字自相矛盾",
-        "evidence": "实跑：1000*5^1.5=11180、1000*10^1.5=31622；2236 与 3162 实际是 1000*sqrt(N)。且 sqrt 曲线的每级成本递减（414/318/268/…），与文章自己说的『先快后慢』相反。",
-        "action": "不采用该公式；沿用现有 PowerRule(100,1.5)，每级成本 100/283/520/800/1119/… 递增。",
-    },
-    {
-        "claim": "iOS 连胜小组件使用户承诺度提升 60%",
-        "verdict": "官方来源无此数字",
-        "evidence": "Duolingo 官方博客 blog.duolingo.com/widget-feature/ 全文只有『装了小组件的学习者中一半有 ≥6 个月连胜』和『控制选择偏差后留存仍更好』，未给 60%；且官方明确提示装小组件的人本来就更投入。60% 出自第三方营销博客转述。",
-        "action": "只采纳『把连胜放到显眼位置』这个设计动作，不把 60% 写进系统或当作效果承诺。",
-    },
-    {
-        "claim": "损失厌恶：失去的痛苦约为同等获得快乐的 2 倍",
-        "verdict": "有学术出处，但不是普适定律",
-        "evidence": "Tversky & Kahneman 1992 累积前景理论给出损失厌恶系数中位数约 2.25；1979 前景理论提出 losses loom larger than gains。2022 年起有多国学者质疑其解释力与适用范围。",
-        "action": "作为连胜『损失感』的设计动机；具体宽限参数由本系统自定，不从这个倍数推导。",
-    },
-    {
-        "claim": "蔡格尼克效应驱动进度条",
-        "verdict": "类比，不是该效应的原始定义",
-        "evidence": "蔡格尼克效应原指『对未完成/被打断任务的记忆优于已完成任务』（经典实验回忆率 68% vs 43%），是记忆效应，不是进度条动机。",
-        "action": "进度条照做（现有系统已有），但不拿这个效应当科学依据。",
-    },
-)
-
-# --------------------------------------------------------------------------
-# 2026-11-08 本轮「信任 / 上瘾 / 利他」三层意见的联网反向核实。
-# 原则：机制可以借鉴，未经一手来源证实的数字与专名一律不写进系统当事实。
-# 每条带 verdict（结论）/ evidence（实抓证据）/ action（本系统怎么做）。
 # --------------------------------------------------------------------------
 SOURCE_VERIFICATION: tuple[dict, ...] = (
     {
@@ -738,14 +669,14 @@ SETTLEMENT_SAFETY_QUESTIONS: tuple[dict, ...] = (
      "options": ({"value": 0, "label": "没有"},
                  {"value": 1, "label": "有（本次不计入）"})},
     {"key": "rpe", "label": "这次有多累（Borg RPE 6–20）？",
-     "hint": "Borg 主观用力等级；超过 17 属极高强度，本次判为无效",
+     "hint": "Borg 6–20：9=很轻松、12=有点吃力、14=剧烈、17=很吃力；超过 17 本次不计入",
      "default": 12,
      "options": ({"value": 9, "label": "9 · 很轻松"},
                  {"value": 12, "label": "12 · 有点吃力"},
                  {"value": 14, "label": "14 · 剧烈"},
                  {"value": 18, "label": "18 · 过头了（不计入）"})},
     {"key": "stop_sign", "label": "有没有胸口疼、头晕、喘不上气这类信号？",
-     "hint": "ACSM 停止运动警示信号；出现即本次判为无效",
+     "hint": "胸口疼/压迫感、头晕要晕倒、喘不上气、心悸、恶心——出现任一项立即停，本次不计入",
      "default": 0,
      "options": ({"value": 0, "label": "没有"},
                  {"value": 1, "label": "有（本次不计入）"})},
@@ -763,10 +694,12 @@ SETTLEMENT_FORMS: dict[str, dict] = {
                 "hint": "系统标尺，不是 CEFR 规定值；低于 1 分钟不计入"},
             "active_phrases": {
                 "label": "这次主动用了几个新表达？",
-                "hint": "自己主动说出来才算，照着稿念不计；低于 1 个不计入"},
+                "hint": "练前列 3 个要用的表达，练完只数真正说出口的（照稿念不算）；"
+                        "1 个算有效，8 个以上才有加成"},
             "listener_score": {
                 "label": "对方听懂了多少（0-100）？",
-                "hint": "按听者反馈或录音复核自评；低于 60 不计入"},
+                "hint": "让对方复述你刚说的两点：能复述大意=70，细节基本准确=85；"
+                        "没人听就隔天回放录音、按「不看稿能听懂多少」打分；60 以下不算"},
         },
         "difficulty_label": "这次话题对你有多难？",
         "note_placeholder": "例：第一次连续说到 6 分 20 秒",
@@ -838,7 +771,8 @@ SETTLEMENT_FORMS: dict[str, dict] = {
         "metrics": {
             "deliverables": {
                 "label": "这次实际交付了几件作品？",
-                "hint": "按可核对交付物计，不按成片时长折算；低于 1 件不计入"},
+                "hint": "按可核对交付物计，不按成片时长折算；1 件就算一次有效，"
+                        "等级看累计件数，不会因为你每次只交 1 件被卡住"},
             "client_acceptance": {
                 "label": "客户 / 需求方验收通过率（0-100）？",
                 "hint": "按验收记录填；本机只记自报值，不校验真伪；低于 60 不计入"},
@@ -856,14 +790,15 @@ SETTLEMENT_FORMS: dict[str, dict] = {
                          "长距离", "技术动作练习"),
         "metrics": {
             "distance_meters": {
-                "label": "跑了多少米？",
-                "hint": "距离只是练习量标尺，不是官方能力等级；低于 500 米不计入"},
+                "label": "这次跑了多少米？",
+                "hint": "等级看「最长的一次」，平时跑短不拖后腿；低于 500 米不算"},
             "cadence_spm": {
                 "label": "平均步频（步 / 分）？",
                 "hint": "ACSM：较习惯步频提高 5–10% 通常使步频 >170，且无通用金标准；低于 140 不计入"},
             "form_score": {
-                "label": "技术动作自评（0-100）？",
-                "hint": "系统不采集视频；低于 60 不计入"},
+                "label": "技术动作评分（0-100）？",
+                "hint": "别凭感觉：录侧面 10 秒，对照「落地靠近重心、躯干稳、不跨大步」逐条扣分；"
+                        "没录也没人看就填 60（=动作基本标准），60 以下不算"},
         },
         "difficulty_label": "这次训练强度对你有多难？",
         "note_placeholder": "例：第 3 公里落地偏前，后面刻意收步幅",
@@ -875,14 +810,16 @@ SETTLEMENT_FORMS: dict[str, dict] = {
                          "全身循环", "力量主项 + 辅助"),
         "metrics": {
             "working_sets": {
-                "label": "有效做了几组？",
-                "hint": "ACSM 2026：力量 2–3 组 / 动作，增肌约 10 组 / 肌群 / 周；低于 1 组不计入"},
+                "label": "这次有效做了几组？",
+                "hint": "只算正式组（热身不算）。系统看的是每次平均 2–10 组、长期坚持；"
+                        "一天堆到 30 组不会更快升级，反而更容易受伤"},
             "reps_per_set": {
                 "label": "每组大约几次？",
                 "hint": "ACSM 2009：新手 8–12RM；低于 5 次不计入"},
             "form_score": {
-                "label": "动作质量自评（0-100）？",
-                "hint": "系统不采集视频；低于 60 不计入"},
+                "label": "动作质量评分（0-100）？",
+                "hint": "录一组侧面视频，对照「全程控制、无代偿、关节不痛」打分；"
+                        "没录就填 60（=动作基本标准），60 以下不算"},
         },
         "difficulty_label": "这次训练强度对你有多难？",
         "note_placeholder": "例：深蹲 60kg 4×8，最后一组略变形",
@@ -2017,6 +1954,9 @@ class MetricSpec:
     basis: str = "draft"
     source_ids: tuple[str, ...] = ()
     note: str = ""
+    # 等级判定用哪一种口径：mean=历史均值，total=累计总量，max=单次最好。
+    # 剪辑按累计交付件数、跑步按最长单次距离，避免「每次只交 1 件」被均值卡死。
+    aggregate: str = "mean"
 
     def __post_init__(self) -> None:
         if len(self.level_requirements) != MAX_LEVEL:
@@ -2030,6 +1970,8 @@ class MetricSpec:
             raise ValueError(f"{self.key}: 等级要求必须单调不减")
         if self.basis not in ("hard", "draft", "system"):
             raise ValueError(f"{self.key}: basis 必须是 hard/draft/system")
+        if self.aggregate not in ("mean", "total", "max"):
+            raise ValueError(f"{self.key}: aggregate 必须是 mean/total/max")
 
     def to_dict(self) -> dict:
         return {
@@ -2038,6 +1980,7 @@ class MetricSpec:
             "range_low": self.range_low, "range_high": self.range_high,
             "level_requirements": list(self.level_requirements),
             "basis": self.basis, "source_ids": list(self.source_ids), "note": self.note,
+            "aggregate": self.aggregate,
         }
 
 
@@ -2141,11 +2084,15 @@ SKILL_RULES: dict[str, SkillRule] = {
             MetricSpec("active_phrases", "主动使用新表达", "个",
                        min_valid=1, good=8, range_low=0, range_high=100,
                        level_requirements=(0, 2, 5, 10, 18, 30, 45, 60),
-                       basis="system"),
+                       basis="system",
+                       note="填「这次真正说出口的新表达个数」，不是计划要用的；"
+                            "练前在纸上列 3 个、练完勾掉没说的，只数为准"),
             MetricSpec("listener_score", "听者可理解度", "0-100",
                        min_valid=60, good=85, range_low=0, range_high=100,
                        level_requirements=(0, 60, 70, 80, 88, 95, 97, 98),
-                       basis="system"),
+                       basis="system",
+                       note="让别人复述你刚说的两点：能复述大意 70，细节基本准确 85；"
+                            "没有旁人就把录音隔天回放，按「不看稿能听懂多少」打分"),
         ),
         level_observables=(
             "A1：对方放慢并愿意重复时能简单问答，用简单短语描述住处与熟人。",
@@ -2266,9 +2213,10 @@ SKILL_RULES: dict[str, SkillRule] = {
         metrics=(
             MetricSpec("deliverables", "本次交付作品数", "件",
                        min_valid=1, good=3, range_low=0, range_high=50,
-                       level_requirements=(0, 1, 2, 4, 7, 11, 16, 22),
-                       basis="system",
-                       note="拍板改为可核对交付物；件数须对应实际交付记录，不按成片时长折算"),
+                       level_requirements=(0, 3, 8, 15, 25, 40, 60, 90),
+                       basis="system", aggregate="total",
+                       note="按「累计交付件数」算等级：每次只交 1 件也能稳稳升级；"
+                            "件数须对应实际交付记录，不按成片时长折算"),
             MetricSpec("client_acceptance", "客户验收通过率", "0-100",
                        min_valid=60, good=90, range_low=0, range_high=100,
                        level_requirements=(0, 60, 70, 80, 88, 95, 97, 98),
@@ -2303,8 +2251,10 @@ SKILL_RULES: dict[str, SkillRule] = {
         metrics=(
             MetricSpec("distance_meters", "单次距离", "米",
                        min_valid=500, good=5_000, range_low=0, range_high=100_000,
-                       level_requirements=(0, 2_000, 5_000, 10_000, 20_000, 30_000, 42_195, 50_000),
-                       basis="draft", note="文章草案；ACSM 未规定能力等级距离"),
+                       level_requirements=(0, 1_000, 2_000, 3_000, 5_000, 10_000, 15_000, 21_097),
+                       basis="draft", aggregate="max",
+                       note="按「最长的一次」算，不是平均：偶尔跑一次长的就算数，"
+                            "不会因为平时跑得短把均值拖死；ACSM 未规定能力等级距离"),
             MetricSpec("cadence_spm", "平均步频", "步/分",
                        min_valid=140, good=170, range_low=0, range_high=250,
                        level_requirements=(0, 150, 160, 165, 170, 170, 175, 175),
@@ -2313,7 +2263,9 @@ SKILL_RULES: dict[str, SkillRule] = {
             MetricSpec("form_score", "技术动作评分", "0-100",
                        min_valid=60, good=85, range_low=0, range_high=100,
                        level_requirements=(0, 60, 70, 80, 88, 95, 97, 98),
-                       basis="system", note="按自评处理；系统不采集视频，如需高可信度可后续接视频复核"),
+                       basis="system",
+                       note="不靠感觉打分：录一段侧面视频，对照「落地靠近重心、躯干稳定、"
+                            "步频不跨大步」逐条给分；60 = 基本标准，80 = 教练看过没大问题"),
         ),
         level_observables=(
             "在直接监督下完成走跑结合，理解 RPE 与停止运动信号。",
@@ -2338,10 +2290,11 @@ SKILL_RULES: dict[str, SkillRule] = {
         evidence_type="mixed", official_max_level=8, medical_gate=True,
         metrics=(
             MetricSpec("working_sets", "有效组数", "组",
-                       min_valid=1, good=10, range_low=0, range_high=60,
-                       level_requirements=(0, 2, 6, 10, 16, 24, 32, 40),
+                       min_valid=1, good=8, range_low=0, range_high=60,
+                       level_requirements=(0, 2, 3, 4, 5, 6, 8, 10),
                        basis="hard", source_ids=("acsm_rt2026",),
-                       note="ACSM 2026：力量 2–3 组/动作；增肌约 10 组/肌群/周；首要结论是坚持"),
+                       note="按「每次平均组数」算，上限降到 10 组：一天堆 40 组不等于更强，"
+                            "ACSM 2026 的首要是长期坚持（每周 2–3 次、力量 2–3 组/动作）"),
             MetricSpec("reps_per_set", "每组次数", "次",
                        min_valid=5, good=12, range_low=0, range_high=50,
                        level_requirements=(0, 8, 8, 10, 12, 12, 12, 12),
@@ -2350,7 +2303,9 @@ SKILL_RULES: dict[str, SkillRule] = {
             MetricSpec("form_score", "动作质量评分", "0-100",
                        min_valid=60, good=85, range_low=0, range_high=100,
                        level_requirements=(0, 60, 70, 80, 88, 95, 97, 98),
-                       basis="system", note="按自评处理；与「数据来源=自报」一致，系统不采集视频"),
+                       basis="system",
+                       note="不靠感觉打分：录一段动作视频，对照「全程控制、无代偿、"
+                            "关节不痛」逐条给分；60 = 动作基本标准，80 = 教练看过没大问题"),
         ),
         level_observables=(
             "新手：在指导下以 8–12RM 负荷完成基础动作，每周 2–3 次（ACSM 2009）。",
@@ -2777,6 +2732,11 @@ def evaluate_skill_metrics(rule: SkillRule, metrics: object) -> MetricVerdict:
     return MetricVerdict(True, "OK", factor, tuple(checks))
 
 
+def required_of(spec, index: int) -> int:
+    """取某指标在某等级的要求值（索引已夹在 0..MAX_LEVEL-1）。"""
+    return int(spec.level_requirements[index])
+
+
 def assess_skill_level(rule: SkillRule, level: int, stats: dict,
                        metric_sums: dict[str, int]) -> dict:
     """按技能专属标准逐项判定某等级是否达标。纯函数。
@@ -2794,24 +2754,42 @@ def assess_skill_level(rule: SkillRule, level: int, stats: dict,
 
     extra = []
     lifetime = {}
+    metric_max = stats.get("metric_max") or {}
     for spec in rule.metrics:
-        life_avg = (int(metric_sums.get(spec.key, 0)) // sessions
-                    if sessions > 0 else 0)
-        lifetime[spec.key] = life_avg
-        avg = (int(wsum["metric_avgs"].get(spec.key, 0))
-               if use_window else life_avg)
+        agg = getattr(spec, "aggregate", "mean")
+        if agg == "total":
+            life_val = int(metric_sums.get(spec.key, 0))
+        elif agg == "max":
+            life_val = int(metric_max.get(spec.key, 0))
+        else:
+            life_val = (int(metric_sums.get(spec.key, 0)) // sessions
+                        if sessions > 0 else 0)
+        lifetime[spec.key] = life_val
+        # 「累计 / 单次最好」不参与近期窗口判定：它们本身就是单调或取极值的量。
+        if agg == "mean":
+            current = (int(wsum["metric_avgs"].get(spec.key, 0))
+                       if use_window else life_val)
+            label = (f"{spec.label}近期均值（{spec.unit}）" if use_window
+                     else f"{spec.label}均值（{spec.unit}）")
+            action = (f"把{spec.label}的均值从 {life_val} 提到 {required_of(spec, index)} {spec.unit}"
+                      if life_val < required_of(spec, index) else "")
+        else:
+            current = life_val
+            label = (f"{spec.label}（累计，{spec.unit}）" if agg == "total"
+                     else f"{spec.label}（单次最好，{spec.unit}）")
+            action = (f"把{spec.label}累计到 {required_of(spec, index)} {spec.unit}（现在 {life_val}）"
+                      if agg == "total" and life_val < required_of(spec, index)
+                      else f"把{spec.label}的单次最好成绩提到 {required_of(spec, index)} {spec.unit}（现在 {life_val}）"
+                      if agg == "max" and life_val < required_of(spec, index) else "")
         required = spec.level_requirements[index]
         extra.append({
             "key": spec.key,
-            "label": (f"{spec.label}近期均值（{spec.unit}）" if use_window
-                      else f"{spec.label}均值（{spec.unit}）"),
+            "label": label,
             "required": required,
-            "actual": avg,
-            "lifetime_avg": life_avg,
-            "passed": avg >= required or fast,
-            "action": (f"把{spec.label}均值从 {avg} 提到 {required} {spec.unit}"
-                       f"（下次这项至少填 {required}）"
-                       if avg < required else ""),
+            "actual": current,
+            "lifetime_avg": life_val,
+            "passed": current >= required or fast,
+            "action": action,
             "is_skill_metric": True,
         })
     checks = list(base["checks"]) + extra
@@ -2847,90 +2825,48 @@ def assess_skill_level(rule: SkillRule, level: int, stats: dict,
 
 
 def rulebook() -> dict:
-    """导出完整规则定义，供网页展示与人工核对。"""
+    """面向用户的规则摘要。
+
+    这里只放「用户理解系统需要知道」的部分：等级门槛、各技能记什么、
+    判定顺序与边界。系数、衰减曲线、公式、决策记录、来源核对等内部
+    实现不对外导出——避免整本规则被原样搬走；引擎内部仍按完整常量运行。
+    """
     return {
-        "constants": {
-            "MIN_QUALITY": MIN_QUALITY,
-            "NO_FEEDBACK_QUALITY_GATE": NO_FEEDBACK_QUALITY_GATE,
-            "LOW_STREAK_LIMIT": LOW_STREAK_LIMIT,
-            "REPEAT_WINDOW": REPEAT_WINDOW,
-            "RESUME_IDLE_DAYS": RESUME_IDLE_DAYS,
-            "DECAY_GRACE_SECONDS": DECAY_GRACE_SECONDS,
-            "RETENTION_FLOOR_BPS": RETENTION_FLOOR_BPS,
-            "GOOD_BONUS_BPS": GOOD_BONUS_BPS,
-        },
         "max_level": MAX_LEVEL,
         "skill_ids": list(SKILL_IDS),
         "skill_rules": {sid: rule.to_dict() for sid, rule in SKILL_RULES.items()},
-        "standard_sources": {k: dict(v) for k, v in STANDARD_SOURCES.items()},
-        "decision_points": [dict(p) for p in DECISION_POINTS],
-        "decision_status": "decided",
-        "open_decisions": [dict(x) for x in OPEN_DECISIONS],
-        "open_decision_status": "applied",
-        "open_decision_evidence": collect_open_items(),
-        "applied_decisions": dict(APPLIED_DECISIONS),
-        "implementation_notes": dict(IMPLEMENTATION_NOTES),
-        "assess_gate_enabled": True,
-        "streak_rules": dict(STREAK_RULES),
-        "article_fact_checks": [dict(x) for x in ARTICLE_FACT_CHECKS],
-        "source_verification": [dict(x) for x in SOURCE_VERIFICATION],
-        "diagnosis_verification": [dict(x) for x in DIAGNOSIS_VERIFICATION],
-        "proficiency_definition": dict(PROFICIENCY_DEFINITION),
-        "review_verification": [dict(x) for x in REVIEW_VERIFICATION],
-        "shape_rules": dict(SHAPE_RULES),
-        "trust_rules": dict(TRUST_RULES),
-        "low_friction": dict(LOW_FRICTION_RULES),
-        "settlement_form_meta": dict(SETTLEMENT_FORM_META),
         "settlement_forms": settlement_form_book(),
-        "capability_verification": [dict(x) for x in CAPABILITY_VERIFICATION],
-        "narrative_rules": dict(NARRATIVE_RULES),
-        "altruism_rules": dict(ALTRUISM_RULES),
-        "altruism_reason_codes": dict(ALTRUISM_REASON_CODES),
-        "reputation_titles": [dict(x) for x in REPUTATION_TITLES],
-        "ulives_reference": ULIVES_REFERENCE,
-        "realm_titles": list(REALM_TITLES),
-        "achievements": [dict(x) for x in ACHIEVEMENTS],
+        "settlement_form_meta": {
+            "difficulty_hint": SETTLEMENT_FORM_META["difficulty_hint"],
+            "task_hint": SETTLEMENT_FORM_META["task_hint"],
+        },
+        "level_criteria": [dict(c) for c in LEVEL_CRITERIA],
         "plain_rules": [dict(x) for x in PLAIN_RULES],
+        "trigger_boundaries": {
+            "upgrade": "经验到线、并且下一级的四项达标条件全过，才升一级；缺一项就停在原地，界面会写清缺哪项。",
+            "grace": "当天之内不扣保持度，隔一天才开始生疏，避免边界反复跳级。",
+            "settle": "生疏与退化只在打开页面或记录练习时结算，不会在后台偷偷掉级。",
+            "floor": "保持度最低 35%，累计经验只增不减，等级不会掉到 LV1 以下。",
+            "resume": "停练 14 天后回来练一次，会补一部分保持度，等级回升比自然恢复快。",
+        },
+        "reason_codes": {
+            "INVALID_INPUT": "填的数超出合法范围或格式不对。",
+            "TIME_REVERSED": "这次记录的时间早于上一次，系统不回溯。",
+            "QUALITY_BELOW_MIN": "完成质量低于 40 分，这一次不算。",
+            "NO_FEEDBACK_LOW_QUALITY": "没有反馈来源、质量又低于 70 分，不算。",
+            "LOW_DIFFICULTY_STREAK": "连续 3 次低难度，判为舒适区，不算。",
+            "REPEATED_TASK": "同一个任务连续练，第 3 次起不算（换任务或提高难度）。",
+            "OK": "这一次计入熟练度。",
+        },
         "medical_gate": {
             "keys": list(MEDICAL_KEYS),
             "rpe_range": [RPE_MIN, RPE_MAX],
             "rpe_vigorous": RPE_VIGOROUS,
             "rpe_reject_above": RPE_REJECT_ABOVE,
-            "source_ids": ["borg_rpe", "acsm_screening", "stop_signs"],
         },
-        "skill_metric_gate_order": [
-            "MISSING_METRICS", "INVALID_METRICS", "INVALID_MEDICAL",
-            "PAIN_REPORTED", "MEDICAL_STOP_SIGN", "RPE_TOO_HIGH",
-            "SKILL_GATE_FAILED", "OK",
-        ],
         "threshold_disclaimer": (
             "等级锚点：语言采用 CEFR/DELE 官方 can-do（A1–C2），办公采用 ICDL/MOS 阶梯，"
-            "剪辑 LV1–LV2 采用 Adobe ACP 官方指南，运动安全门采用 Borg RPE/ACSM；"
-            "LV1–LV8 名称对齐 EQF 描述符。每个指标在 basis 中标明 hard(官方) / draft(文章示例草案，需拍板) / system(本系统标尺)。"
-            "官方未覆盖的等级：按拍板结果，语言 LV7–LV8 与剪辑 LV3–LV8 自建标准并标注「自建标准·非官方」；"
-            "办公 LV6–LV8 仍标注「无官方对应，待定」。两种情况都不冒充官方阈值。"
+            "剪辑 LV1–LV2 采用 Adobe ACP 官方指南，运动安全门采用 Borg RPE/ACSM。"
+            "官方未覆盖的等级标注「自建标准·非官方」，不冒充官方阈值。"
         ),
-        "trigger_boundaries": {
-            "upgrade": "结算后有效熟练度 >= 下一级累计阈值，且逐级通过 assess_skill_level 可观测达标校验才升级；未通过则卡在原级（gate_blocked=True），一次练习可连升多级",
-            "gate_exempt": "add_exp / set_total_exp / set_level 属管理注入与回档，显式授予经验对应等级，绕过练习路径的达标校验",
-            "downgrade": "结算后有效熟练度 < 当前等级累计阈值即退化；因 1 天宽限期，实际只在搁置 >= 1 天后发生；最低 Lv.1",
-            "grace": "搁置不足 1 天：保持度恒为 10000 bps，不生疏、不退化，避免阈值边界反复跳级",
-            "settle": "生疏与退化不隐式发生，只在 settle(now)/add_practice(now)/带 now 的查询时结算",
-            "floor": "保持度下限 3500 bps，历史累计经验单调不减，等级不会退到 Lv.1 以下",
-            "resume": "搁置 >= 14 天后首次有效练习标记为中断后恢复，回补保持度使等级快速回升",
-        },
-        "feedback_levels": FEEDBACK_LEVELS,
-        "feedback_factor_bps": FEEDBACK_FACTOR_BPS,
-        "challenge_factor_bps": CHALLENGE_FACTOR_BPS,
-        "repeat_factor_bps": REPEAT_FACTOR_BPS,
-        "decay_anchors": [{"days": d, "retention_bps": b} for d, b in DECAY_ANCHORS],
-        "reason_codes": REASON_CODES,
-        "level_criteria": [dict(c) for c in LEVEL_CRITERIA],
-        "formula": {
-            "gain": "max(1, round(20*D * Q/100 * F * M * R * S))，S=10000+500*达到good线的指标数（bps）",
-            "cost": "ceil(base * L^k), k>1（默认 1.5）",
-            "effective_exp": "total_exp * retention_bps // 10000",
-            "retention": "min(上次保持度, 分段线性锚表(搁置时长)), 下限 3500 bps",
-            "recovery": "min(10000, 400 + 6*Q + 100*(有效挑战) + 200*(中断恢复))",
-        },
     }

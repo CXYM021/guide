@@ -859,7 +859,11 @@ def checkpoint_payload_for(skill_id: str) -> dict:
     progress = system.list_progress(now=STATE["clock"]()).get(skill_id)
     if progress is None:
         raise ValueError("技能不存在")
+    seen = system.quiz_seen_ids(skill_id)
     return {"ok": True, **spec,
+            "items": quizzes.pick(skill_id, seen),
+            "credit": progress.quiz_credit,
+            "credits_needed": progress.quiz_credits_needed,
             "current_level": progress.level,
             "exp_level": progress.exp_level,
             "verified_level": progress.verified_level,
@@ -870,18 +874,22 @@ def submit_checkpoint(body: dict) -> dict:
     sid = str(body.get("skill_id") or "").strip()
     if not sid:
         raise ValueError("缺少 skill_id")
-    result = quizzes.grade(sid, body.get("answers") or {})
+    answers = body.get("answers") or {}
+    result = quizzes.grade_answers(sid, answers)
     system: ProficiencySystem = STATE["system"]
-    if result["passed"]:
-        progress = system.list_progress(now=STATE["clock"]()).get(sid)
-        base = progress.level if progress else 1
-        target = min(progress.exp_level if progress else base, base + 1)
-        system.mark_verified(sid, max(1, target), now=STATE["clock"]())
-        system.flush()
-        result["verified_level"] = max(1, target)
-        result["message"] = "验证通过，按经验重新结算等级"
+    outcome = system.record_quiz(
+        sid, result["correct_ids"], attempted_ids=[str(k) for k in answers],
+        now=STATE["clock"]())
+    system.flush()
+    result["passed"] = bool(outcome["passed"])
+    result["credit"] = int(outcome["credit"])
+    result["credits_needed"] = int(outcome["needed"])
+    if outcome["passed"]:
+        result["message"] = "验证通过：答对 3 题，按经验重新结算等级"
     else:
-        result["message"] = "还没全对：下面有每题解析，再来一次，不扣经验"
+        result["message"] = (f"这次答对 {result['correct']} 题，累计 "
+                             f"{outcome['credit']}/{outcome['needed']} 题；"
+                             "等级与经验不变，下一次有效练习后再出题")
     out = skill_payload()
     out["checkpoint_result"] = result
     return out

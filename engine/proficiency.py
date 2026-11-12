@@ -410,6 +410,8 @@ class SkillState:
     recent_fingerprints: list[str] = field(default_factory=list)
     settled_at: int = 0             # 最后一次显式结算的 Unix 秒
     metric_sums: dict[str, int] = field(default_factory=dict)  # 技能专属指标累计值
+    # 指标的单次最好成绩（aggregate=max 的指标用它判等级，如跑步最长距离）
+    metric_max: dict[str, int] = field(default_factory=dict)
     # v5：最近 N 次有效练习的窗口序列，用于「截尾均值」达标校验。
     # 终身累计值仍保留在 quality_sum / metric_sums，只作履历展示。
     recent_sessions: list[dict] = field(default_factory=list)
@@ -421,6 +423,11 @@ class SkillState:
     archived: bool = False
     # 等级验证（v8）：语言类技能 LV5 起要过一次客观小题，记下已验过的等级。
     verified_level: int = 0
+    # 验证题累计答对数（满 3 题升级）；quiz_seen 记已出过的题，避免重复；
+    # quiz_retry_after 记答错时的练习次数，必须再练一次才会重新出题。
+    quiz_credit: int = 0
+    quiz_seen: list[str] = field(default_factory=list)
+    quiz_retry_after: int = 0
 
     def __post_init__(self) -> None:
         _require_skill_id(self.skill_id)
@@ -442,6 +449,12 @@ class SkillState:
         _require_int(self.verified_level, "verified_level", 0)
         if self.verified_level and not 1 <= self.verified_level <= MAX_LEVEL:
             raise ValueError(f"verified_level 必须在 1..{MAX_LEVEL} 或 0")
+        _require_int(self.quiz_credit, "quiz_credit", 0)
+        _require_int(self.quiz_retry_after, "quiz_retry_after", 0)
+        if not isinstance(self.quiz_seen, list) or not all(
+            isinstance(x, str) for x in self.quiz_seen
+        ):
+            raise TypeError("quiz_seen 必须是字符串列表")
         if self.baseline_level and not 1 <= self.baseline_level <= MAX_LEVEL:
             raise ValueError(f"baseline_level 必须在 1..{MAX_LEVEL} 或 0（未自评）")
         if not isinstance(self.metric_sums, dict) or not all(
@@ -449,6 +462,11 @@ class SkillState:
             and v >= 0 for k, v in self.metric_sums.items()
         ):
             raise TypeError("metric_sums 必须是 {str: 非负整数}")
+        if not isinstance(self.metric_max, dict) or not all(
+            isinstance(k, str) and isinstance(v, int) and not isinstance(v, bool)
+            and v >= 0 for k, v in self.metric_max.items()
+        ):
+            raise TypeError("metric_max 必须是 {str: 非负整数}")
         if not isinstance(self.recent_sessions, list) or not all(
             isinstance(row, dict) for row in self.recent_sessions
         ):
@@ -470,10 +488,14 @@ class SkillState:
             "recent_fingerprints": list(self.recent_fingerprints),
             "settled_at": self.settled_at,
             "metric_sums": dict(self.metric_sums),
+            "metric_max": dict(self.metric_max),
             "recent_sessions": [dict(row) for row in self.recent_sessions],
             "baseline_level": self.baseline_level,
             "archived": self.archived,
             "verified_level": self.verified_level,
+            "quiz_credit": self.quiz_credit,
+            "quiz_seen": list(self.quiz_seen),
+            "quiz_retry_after": self.quiz_retry_after,
         }
 
     @staticmethod
@@ -486,6 +508,12 @@ class SkillState:
         prints = data.get("recent_fingerprints", [])
         if not isinstance(prints, list) or not all(isinstance(x, str) for x in prints):
             raise TypeError("recent_fingerprints 必须是字符串列表")
+        raw_seen = data.get("quiz_seen") or []
+        if not isinstance(raw_seen, list) or not all(isinstance(x, str) for x in raw_seen):
+            raise TypeError("quiz_seen 必须是字符串列表")
+        raw_max = data.get("metric_max") or {}
+        if not isinstance(raw_max, dict):
+            raise TypeError("metric_max 必须是对象")
         raw_sums = data.get("metric_sums") or {}
         if not isinstance(raw_sums, dict):
             raise TypeError("metric_sums 必须是对象")
@@ -508,6 +536,7 @@ class SkillState:
             recent_fingerprints=list(prints),
             settled_at=_require_int(data.get("settled_at", 0), "settled_at", 0),
             metric_sums=dict(raw_sums),
+            metric_max={str(k): int(v) for k, v in raw_max.items()},
             recent_sessions=[dict(row) for row in (data.get("recent_sessions") or [])
                              if isinstance(row, dict)],
             baseline_level=_require_int(data.get("baseline_level", 0),
@@ -543,6 +572,8 @@ class SkillProgress:
     archived: bool = False            # 归档后不进今日主线与推荐
     verified_level: int = 0           # 已通过等级验证的最高目标等级
     quiz_required: bool = False        # 下一级需要先过验证题
+    quiz_credit: int = 0               # 已验证题累计答对数（满 3 升级）
+    quiz_credits_needed: int = 3
 
     @property
     def remaining_exp(self) -> int:
@@ -602,6 +633,8 @@ class SkillProgress:
             "archived": self.archived,
             "verified_level": self.verified_level,
             "quiz_required": self.quiz_required,
+            "quiz_credit": self.quiz_credit,
+            "quiz_credits_needed": self.quiz_credits_needed,
         }
 
 
@@ -1116,6 +1149,7 @@ class ProficiencySystem:
                 if stale:
                     for k in stale:
                         state.metric_sums.pop(k, None)
+                        state.metric_max.pop(k, None)
                     corrected = True
             # v4 -> v5：窗口为空时从 append-only 事件日志回填真实练习，
             # 不倒推、不伪造；事件里本来就有 quality/difficulty/feedback/metrics。
@@ -1165,6 +1199,7 @@ class ProficiencySystem:
             "quality_sum": state.quality_sum,
             "feedback_max": state.feedback_max,
             "max_difficulty": state.max_difficulty,
+            "metric_max": dict(state.metric_max),
             "idle_days_bps": self._idle_bps(state, now),
             # shape_enabled=False 时不下传窗口，规则层自动回退终身累计口径，
             # 保证「回退」是完整的（增益与门槛同时回到修正前）。
@@ -1286,11 +1321,14 @@ class ProficiencySystem:
             baseline_level=self._baseline_floor(state),
             archived=bool(state.archived),
             verified_level=int(state.verified_level),
+            quiz_credit=int(state.quiz_credit),
+            quiz_credits_needed=3,
             quiz_required=bool(
                 quiz_level(skill_id)
                 and level + 1 >= quiz_level(skill_id)
                 and int(state.verified_level) < level + 1
                 and exp_level >= level + 1
+                and int(state.valid_sessions) > int(state.quiz_retry_after)
             ),
         )
 
@@ -1589,6 +1627,8 @@ class ProficiencySystem:
                         state.metric_sums[key] = (
                             state.metric_sums.get(key, 0) + int(metrics[key])
                         )
+                        state.metric_max[key] = max(
+                            int(state.metric_max.get(key, 0)), int(metrics[key]))
                 # 连胜是独立维度：每天首次有效练习推进一次，同日重复不增长
                 self._streak = advance_streak(
                     self._streak, t, tz_offset_seconds=self._tz_offset)
@@ -1689,6 +1729,50 @@ class ProficiencySystem:
             state.updated_at = _iso(t)
             self._mark_dirty()
             return self._progress(skill_id, t)
+
+    def quiz_seen_ids(self, skill_id: str) -> list[str]:
+        """已经出过的验证题（用于下次换题）。"""
+        skill_id = _require_skill_id(skill_id)
+        with self._lock:
+            state = self._states.get(skill_id)
+            return list(state.quiz_seen) if state else []
+
+    def record_quiz(self, skill_id: str, correct_ids: list[str], *,
+                    attempted_ids: list[str] = (), now: int | None = None) -> dict:
+        """记一次验证题结果：答对的累计，满 3 题才放行；答错只关界面。
+
+        返回 {"passed": bool, "credit": int, "needed": int, "progress": SkillProgress}。
+        """
+        skill_id = _require_skill_id(skill_id)
+        ids = [str(x) for x in (correct_ids or [])]
+        attempted = [str(x) for x in (attempted_ids or [])] or ids
+        with self._lock:
+            t = self._now(now)
+            if self._ensure_skill(skill_id):
+                self._mark_dirty()
+            state = self._states[skill_id]
+            progress = self._progress(skill_id, t)
+            target = min(progress.exp_level, progress.level + 1)
+            credit = min(3, int(state.quiz_credit) + len(ids))
+            seen = list(state.quiz_seen) + attempted
+            if credit >= 3:
+                state.quiz_credit = 0
+                state.quiz_seen = []
+                state.quiz_retry_after = 0
+                state.verified_level = max(int(state.verified_level), target)
+                state.updated_at = _iso(t)
+                self._settle_unlocked(skill_id, t)
+                passed = True
+            else:
+                state.quiz_credit = credit
+                state.quiz_seen = seen[-12:]
+                # 答错后必须再完成一次有效练习才会重新出题
+                state.quiz_retry_after = int(state.valid_sessions)
+                passed = False
+            self._mark_dirty()
+            return {"passed": passed, "credit": credit, "needed": 3,
+                    "target_level": target,
+                    "progress": self._progress(skill_id, t)}
 
     def mark_verified(self, skill_id: str, level: int, *,
                       now: int | None = None) -> SkillProgress:
