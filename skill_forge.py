@@ -114,7 +114,7 @@ def fetch_sources(urls: list[str], *, allow_private: bool = False) -> list[dict]
         if not allow_private and _is_private_host(parsed.hostname):
             raise ForgeError(f"资料链接指向内网地址，已拒绝：{parsed.hostname}")
         req = urllib.request.Request(
-            url, headers={"User-Agent": "proficiency-web/1.0 (+local skill forge)",
+            url, headers={"User-Agent": "guide-web/1.0 (+local skill forge)",
                           "Accept": "text/html,text/plain,application/json"})
         try:
             with opener.open(req, timeout=FETCH_TIMEOUT) as resp:
@@ -161,7 +161,7 @@ def _http_json(url: str, *, allow_private: bool) -> dict:
     if not allow_private and _is_private_host(parsed.hostname):
         raise ForgeError("检索地址指向内网，已拒绝")
     req = urllib.request.Request(
-        url, headers={"User-Agent": "proficiency-web/1.0 (+local skill forge)",
+        url, headers={"User-Agent": "guide-web/1.0 (+local skill forge)",
                       "Accept": "application/json"})
     opener = urllib.request.build_opener(_NoRedirect)
     with opener.open(req, timeout=FETCH_TIMEOUT) as resp:

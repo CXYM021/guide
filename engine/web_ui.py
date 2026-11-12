@@ -11,7 +11,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>熟练度 · 修行录</title>
+<title>向导 · 修行录</title>
 <style>
   :root {
     --bg: #eef0f6; --paper: #fffdf8; --card: #ffffff;
@@ -1307,7 +1307,7 @@ $('open-sheet').onclick = () => openSheet();
    能力边界：只观察本页自己的 visibilityState，不读手机屏幕状态、不读前台 App、
    不在后台常驻。页面隐藏期间的区间在「回到页面 / 重新打开」时按墙钟补齐。
    候选时长绝不自动折算熟练度，只有 settle 且用户点「算」才走原判定门。      */
-const CAP_KEY = 'proficiency_capture_v1';
+const CAP_KEY = 'guide_capture_v1';
 let captureData = null, settleSession = null, settleFields = null;
 
 function capLocal() {
@@ -1626,7 +1626,7 @@ $('data-export').onclick = async () => {
                           { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'proficiency-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.download = 'guide-backup-' + new Date().toISOString().slice(0, 10) + '.json';
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 3000);
     toast('备份已导出');

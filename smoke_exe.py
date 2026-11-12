@@ -2,7 +2,7 @@
 """下载即用版的可重复验收：把 zip 当刚下载的文件解压、实跑、重启、清理。
 
 运行：python smoke_exe.py
-      python smoke_exe.py --zip dist/proficiency-web-win64.zip
+      python smoke_exe.py --zip dist/guide-web-win64.zip
 退出码 0 = 全部通过，非 0 = 失败（打印失败原因）。
 
 刻意不用 unittest：这一步要求真的起 Windows 进程、真的占用端口、真的
@@ -30,7 +30,7 @@ from pathlib import Path
 import console  # noqa: E402,F401 - 导入即把控制台切成 UTF-8
 
 HERE = Path(__file__).resolve().parent
-EXPECTED_ZIP_FILES = {"proficiency-web.exe", "README.txt",
+EXPECTED_ZIP_FILES = {"guide-web.exe", "README.txt",
                       "PYTHON-LICENSE.txt", "SHA256.txt"}
 
 
@@ -77,9 +77,9 @@ def port_open(port: int) -> bool:
 
 def no_process() -> bool:
     raw = subprocess.run(
-        ["tasklist", "/FI", "IMAGENAME eq proficiency-web.exe"],
+        ["tasklist", "/FI", "IMAGENAME eq guide-web.exe"],
         capture_output=True).stdout
-    return b"proficiency-web.exe" not in raw
+    return b"guide-web.exe" not in raw
 
 
 def launch(root: Path, exe: Path, name: str):
@@ -129,7 +129,7 @@ def run(zip_path: Path) -> None:
     root.mkdir(parents=True)
     with zipfile.ZipFile(zip_path) as z:
         z.extractall(root)
-    exe = root / "proficiency-web.exe"
+    exe = root / "guide-web.exe"
     recorded = (root / "SHA256.txt").read_text(encoding="utf-8").split()[0]
     actual = hashlib.sha256(exe.read_bytes()).hexdigest()
     check(actual == recorded, "SHA256 与包内记录一致")
@@ -235,7 +235,7 @@ def run(zip_path: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--zip", default=str(HERE / "dist" / "proficiency-web-win64.zip"))
+    parser.add_argument("--zip", default=str(HERE / "dist" / "guide-web-win64.zip"))
     args = parser.parse_args()
     try:
         run(Path(args.zip).resolve())

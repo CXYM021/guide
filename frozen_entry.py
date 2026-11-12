@@ -55,8 +55,16 @@ def app_directory() -> Path:
     if _writable(base):
         return base
     fallback = Path(os.environ.get("LOCALAPPDATA")
-                    or os.path.join(tempfile.gettempdir(), "proficiency-web"))
-    target = fallback / "proficiency-web"
+                    or os.path.join(tempfile.gettempdir(), "guide-web"))
+    target = fallback / "guide-web"
+    legacy = fallback / "proficiency-web"
+    if not target.exists() and legacy.exists():
+        # 改名前的旧数据目录：原地搬过来，避免升级后看起来「数据没了」
+        try:
+            legacy.rename(target)
+            print(f"[提示] 已把旧数据目录从 {legacy} 迁移到 {target}")
+        except OSError:
+            pass
     target.mkdir(parents=True, exist_ok=True)
     print(f"[提示] 当前目录不可写，配置与数据改用：{target}")
     return target

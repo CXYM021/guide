@@ -1,13 +1,13 @@
-# 熟练度系统 · Proficiency
+# 向导（熟练度系统） · Guide
 
-[![tests](https://github.com/CXYM021/proficiency/actions/workflows/tests.yml/badge.svg)](https://github.com/CXYM021/proficiency/actions/workflows/tests.yml)
+[![tests](https://github.com/CXYM021/guide/actions/workflows/tests.yml/badge.svg)](https://github.com/CXYM021/guide/actions/workflows/tests.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**[⬇ 下载 Windows 版（免安装 exe）](https://github.com/CXYM021/proficiency/releases/latest/download/proficiency-web-win64.zip)**
-· 解压双击 `proficiency-web.exe` 就能用，不需要 Python。
+**[⬇ 下载 Windows 版（免安装 exe）](https://github.com/CXYM021/guide/releases/latest/download/guide-web-win64.zip)**
+· 解压双击 `guide-web.exe` 就能用，不需要 Python。
 
 > 别点右上角绿色的 `Code → Download ZIP`：那是**源码**，里面没有 exe。
-> 可执行文件只放在 [Releases](https://github.com/CXYM021/proficiency/releases) 里。
+> 可执行文件只放在 [Releases](https://github.com/CXYM021/guide/releases) 里。
 
 把「我在变强」变成可以核对的数据：七项技能、LV1–LV8、只记有效练习、停练会掉、能复测。
 
@@ -29,8 +29,8 @@
 
 ### Windows：下载即用
 
-从 [Releases](../../releases) 下载 `proficiency-web-win64.zip`，解压到任意文件夹，双击
-`proficiency-web.exe`。浏览器会自动打开 `http://127.0.0.1:8765/`，注册一个账号就能用。
+从 [Releases](../../releases) 下载 `guide-web-win64.zip`，解压到任意文件夹，双击
+`guide-web.exe`。浏览器会自动打开 `http://127.0.0.1:8765/`，注册一个账号就能用。
 不需要装 Python、不需要联网。数据和配置落在 exe 同目录的 `data/`、`config.json`。
 
 > 这个 exe 没有代码签名，Windows 第一次运行可能弹「已保护你的电脑」。点「更多信息 →
@@ -227,10 +227,10 @@ rejected; retention decays with idle time; level-ups require recent quality, at 
 objective measurement, and skill-specific metrics. Everything is self-reported (no verification),
 runs on the Python standard library, and stores data in plain files you can export.
 
-**Windows (no Python needed):** [download the single-file exe](https://github.com/CXYM021/proficiency/releases/latest/download/proficiency-web-win64.zip)
-→ unzip → double-click `proficiency-web.exe`. The green `Code → Download ZIP` button on the repo
+**Windows (no Python needed):** [download the single-file exe](https://github.com/CXYM021/guide/releases/latest/download/guide-web-win64.zip)
+→ unzip → double-click `guide-web.exe`. The green `Code → Download ZIP` button on the repo
 page gives you the *source tree*, which contains no executable: binaries are published in
-[Releases](https://github.com/CXYM021/proficiency/releases) only.
+[Releases](https://github.com/CXYM021/guide/releases) only.
 
 Quick start from source: `python server.py` → open <http://127.0.0.1:8765/> → register → take the
 4-question baseline → log your first session.

@@ -2,10 +2,10 @@
 #   PROF_DOMAIN=skill.example.com PROF_INVITE_CODE=yourcode docker compose -f docker-compose.public.yml up -d
 # 前置：域名 A/AAAA 记录已指向本机；云防火墙放行 80/443；不要放行 8765。
 services:
-  proficiency:
+  guide:
     build: ..
-    image: proficiency-web:1.0
-    container_name: proficiency-web
+    image: guide-web:1.0
+    container_name: guide-web
     restart: unless-stopped
     expose:
       - "8765"
@@ -23,10 +23,10 @@ services:
 
   caddy:
     image: caddy:2-alpine
-    container_name: proficiency-caddy
+    container_name: guide-caddy
     restart: unless-stopped
     depends_on:
-      - proficiency
+      - guide
     ports:
       - "80:80"
       - "443:443"

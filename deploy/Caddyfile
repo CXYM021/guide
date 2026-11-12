@@ -4,7 +4,7 @@
 {$PROF_DOMAIN:localhost} {
 	encode zstd gzip
 
-	reverse_proxy proficiency:8765 {
+	reverse_proxy guide-web:8765 {
 		header_up X-Forwarded-Proto https
 		header_up X-Forwarded-Host {host}
 	}

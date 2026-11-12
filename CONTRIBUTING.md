@@ -43,4 +43,4 @@ Python 3.10+，**不引入第三方运行时依赖**。测试可以只用标准�
 1. `python -m unittest discover -s tests` 全绿；
 2. `python build_ui.py`、`python build_exe.py`；
 3. `python smoke_exe.py` 过；
-4. 更新 `CHANGELOG.md`，打 tag `vX.Y.Z`，把 `dist/proficiency-web-win64.zip` 传到 Release。
+4. 更新 `CHANGELOG.md`，打 tag `vX.Y.Z`，把 `dist/guide-web-win64.zip` 传到 Release。

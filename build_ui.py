@@ -46,8 +46,8 @@ def sync_service_worker(version: str) -> bool:
     """把 sw.js 的缓存名对齐到版本号：每次发版都换一个壳缓存，免得旧页面赖着不走。"""
     path = HERE / "ui" / "sw.js"
     text = path.read_text(encoding="utf-8")
-    new = re.sub(r"proficiency-shell-[0-9A-Za-z.\-]+",
-                 "proficiency-shell-" + version, text, count=1)
+    new = re.sub(r"guide-shell-[0-9A-Za-z.\-]+",
+                 "guide-shell-" + version, text, count=1)
     if new == text:
         return False
     path.write_text(new, encoding="utf-8", newline="\n")

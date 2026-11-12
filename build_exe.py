@@ -2,8 +2,8 @@
 """构建「下载即用」的 Windows 单文件 exe 与分发 zip。
 
 运行：python build_exe.py
-产物：dist/proficiency-web.exe
-      dist/proficiency-web-win64.zip（exe + 说明 + Python 许可证 + SHA256）
+产物：dist/guide-web.exe
+      dist/guide-web-win64.zip（exe + 说明 + Python 许可证 + SHA256）
 
 构建期需要联网把 PyInstaller 装进临时目录（不污染系统 Python，不写全局
 site-packages）；构建完临时目录自动删除。产物运行时零第三方依赖、不需要
@@ -40,7 +40,7 @@ README = """熟练度 · 修行录 —— 下载即用版（Windows 64 位）
 
 一、怎么用
 ----------
-1. 把 proficiency-web.exe 放到一个你找得到的文件夹（桌面或新建文件夹都行）。
+1. 把 guide-web.exe 放到一个你找得到的文件夹（桌面或新建文件夹都行）。
 2. 双击它。会弹出一个黑色窗口，稍等 2–5 秒，浏览器自动打开系统页面。
 3. 注册一个账号就能用。每人一个账号，数据互相看不见。
 4. 用完直接关掉黑窗口即停止服务。数据已存盘，下次双击还在。
@@ -61,7 +61,7 @@ exe 同目录下会自动生成：
 升级 = 只替换 exe，保留 config.json 和 data。
 
 如果 exe 放在不可写的目录（例如 C:\\Program Files），程序会改用
-%LOCALAPPDATA%\\proficiency-web\\ 存配置和数据，启动窗口会打印实际路径。
+%LOCALAPPDATA%\\guide-web\\ 存配置和数据，启动窗口会打印实际路径。
 
 三、让别人的电脑 / 手机也能用
 ------------------------------
@@ -103,7 +103,7 @@ exe 同目录下会自动生成：
   set PROF_AI_ENDPOINT=https://你的端点/v1
   set PROF_AI_KEY=你的密钥
   set PROF_AI_MODEL=你的模型名
-  proficiency-web.exe
+  guide-web.exe
 
 然后在添加技能时填 1–3 个公开资料网址。服务端会抓取正文（限 256KB、
 禁重定向、默认拒绝内网地址防 SSRF），连同严格 JSON 结构要求交给模型；
@@ -162,7 +162,7 @@ def build_exe(tools_dir: str) -> Path:
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--noconfirm", "--clean", "--onefile", "--console",
-        "--name", "proficiency-web",
+        "--name", "guide-web",
         "--distpath", str(DIST), "--workpath", str(WORK / "work"),
         "--specpath", str(WORK),
         "--paths", str(HERE), "--paths", str(HERE / "engine"),
@@ -178,7 +178,7 @@ def build_exe(tools_dir: str) -> Path:
     if tools_dir:
         env["PYTHONPATH"] = tools_dir + os.pathsep + env.get("PYTHONPATH", "")
     subprocess.run(cmd, cwd=str(HERE), env=env, check=True, timeout=900)
-    exe = DIST / "proficiency-web.exe"
+    exe = DIST / "guide-web.exe"
     if not exe.is_file():
         raise FileNotFoundError(f"构建结束但没找到 {exe}")
     return exe
@@ -195,11 +195,11 @@ def package(exe: Path) -> Path:
         lic.write_text(LICENSE_NOTE, encoding="utf-8")
     digest = hashlib.sha256(exe.read_bytes()).hexdigest()
     (DIST / "SHA256.txt").write_text(
-        f"{digest}  proficiency-web.exe\n", encoding="utf-8")
+        f"{digest}  guide-web.exe\n", encoding="utf-8")
 
-    zip_path = DIST / "proficiency-web-win64.zip"
+    zip_path = DIST / "guide-web-win64.zip"
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
-        for name in ("proficiency-web.exe", "README.txt",
+        for name in ("guide-web.exe", "README.txt",
                      "PYTHON-LICENSE.txt", "SHA256.txt"):
             z.write(DIST / name, name)
     print(f"exe   : {exe}  {exe.stat().st_size / 1024 / 1024:.1f} MB")

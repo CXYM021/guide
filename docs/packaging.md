@@ -1,7 +1,7 @@
 # 打包成单文件 exe（Windows）
 
 仓库里不放构建产物（`dist/` 已被 `.gitignore` 排除）。想给不会装 Python 的人用，
-在 Windows 上跑一次下面这条命令，然后把 `dist/proficiency-web-win64.zip` 传到 Release。
+在 Windows 上跑一次下面这条命令，然后把 `dist/guide-web-win64.zip` 传到 Release。
 
 ```bat
 python build_exe.py

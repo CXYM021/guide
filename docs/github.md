@@ -14,13 +14,13 @@ CI 跑测试、LICENSE / SECURITY / CONTRIBUTING / CHANGELOG 齐全、文档在 
 3. 选 **Public**，**不要**勾 Add a README / .gitignore / license（仓库里已有）。
 4. 点 **Create repository**。
 5. 在新仓库页面点 **uploading an existing file**。
-6. 打开本机 `proficiency-system` 文件夹，全选里面的**内容**（不是文件夹本身），
+6. 打开本机 `guide-system` 文件夹，全选里面的**内容**（不是文件夹本身），
    拖进浏览器上传框。`.github`、`docs`、`engine` 这些目录会被保留。
 7. Commit message 填 `Initial release v1.0.0`，点 **Commit changes**。
 8. 等 GitHub 渲染完，检查首页 README 是否正常显示、Actions 里 `tests` 是否跑绿。
 9. 打一个版本：右侧 **Releases → Create a new release**，Tag 填 `v1.0.0`，
    标题 `v1.0.0`，说明从 `CHANGELOG.md` 复制。
-10. 如果你已经在本机打过 exe 包，把 `dist/proficiency-web-win64.zip` 拖到 release 的
+10. 如果你已经在本机打过 exe 包，把 `dist/guide-web-win64.zip` 拖到 release 的
     **Attach binaries** 区域，再点 **Publish release**。
 
 > 网页上传对单个文件有 25 MB 限制；本仓库源码远小于此。exe 走 Release 附件，不进仓库。
@@ -30,7 +30,7 @@ CI 跑测试、LICENSE / SECURITY / CONTRIBUTING / CHANGELOG 齐全、文档在 
 先装 Git for Windows（<https://git-scm.com/download/win>），然后：
 
 ```bat
-cd C:\Users\MLTZ\Documents\deepseek-harness\default-workspace\proficiency-system
+cd C:\Users\MLTZ\Documents\deepseek-harness\default-workspace\guide-system
 git init
 git add .
 git commit -m "Initial release v1.0.0"
@@ -72,7 +72,7 @@ git push --tags
 
 ## 别人怎么用（可以复制给用户）
 
-- 只想试试：下载 Release 里的 `proficiency-web-win64.zip`，解压双击 exe。
+- 只想试试：下载 Release 里的 `guide-web-win64.zip`，解压双击 exe。
 - 想长期用：`git clone` 后 `python server.py`，或 `docker compose up -d`。
 - 想给自己团队/社群用：参考 [deploy.md](deploy.md) 的「局域网」与「公网」两档，
   公网务必设 `PROF_INVITE_CODE`、`PROF_SECURE_COOKIES=1`、`PROF_ALLOWED_ORIGINS`，

@@ -35,9 +35,9 @@ class UiVersionTest(unittest.TestCase):
     def test_service_worker_cache_tracks_version(self) -> None:
         version = product_version()
         sw = (ROOT / "ui" / "sw.js").read_text(encoding="utf-8")
-        self.assertIn(f"proficiency-shell-{version}", sw)
-        others = set(re.findall(r"proficiency-shell-[0-9A-Za-z.\-]+", sw))
-        self.assertEqual(others, {f"proficiency-shell-{version}"})
+        self.assertIn(f"guide-shell-{version}", sw)
+        others = set(re.findall(r"guide-shell-[0-9A-Za-z.\-]+", sw))
+        self.assertEqual(others, {f"guide-shell-{version}"})
 
     def test_shell_is_network_first(self) -> None:
         sw = (ROOT / "ui" / "sw.js").read_text(encoding="utf-8")

@@ -1,4 +1,4 @@
-/* 熟练度 · 修行录 — 只缓存应用外壳，绝不缓存任何 /api/ 响应。
+/* 向导 · 熟练度系统 — 只缓存应用外壳，绝不缓存任何 /api/ 响应。
  * 原因：API 返回的是「当前登录用户」的数据，按 URL 缓存会让不同账号串数据。
  *
  * 页面外壳走「网络优先、离线回退」：升级后哪怕 Service Worker 还是旧的，
@@ -10,7 +10,7 @@
  *
  * Service Worker 只在 HTTPS 或 localhost 下生效；局域网 http://192.168.x.x 不会注册。
  */
-var CACHE = 'proficiency-shell-1.0.7';
+var CACHE = 'guide-shell-1.0.8';
 var SHELL = ['/', '/index.html'];
 var ASSETS = ['/manifest.webmanifest', '/icon-192.png', '/icon-512.png'];
 

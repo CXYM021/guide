@@ -1,8 +1,8 @@
 services:
   proficiency:
     build: .
-    image: proficiency-web:1.0
-    container_name: proficiency-web
+    image: guide-web:1.0
+    container_name: guide-web
     restart: unless-stopped
     ports:
       - "8765:8765"

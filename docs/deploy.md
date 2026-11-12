@@ -25,7 +25,7 @@ PROF_INVITE_CODE=换成一个不短的码 ./start_lan.sh      # Windows: start_l
 
 - 局域网是 **HTTP**，密码与会话明文传输，只建议在可信网络（家里/办公室）里用。
 - 防火墙要放行端口。Windows 首次会弹窗，勾选「专用网络」；命令行可加：
-  `netsh advfirewall firewall add rule name="proficiency-web" dir=in action=allow protocol=TCP localport=8765 profile=private`
+  `netsh advfirewall firewall add rule name="guide-web" dir=in action=allow protocol=TCP localport=8765 profile=private`
 - `start_lan` 在没设邀请码时会警告。**对外开放就必须设**，否则任何人都能注册。
 - 主机必须常开；休眠或换 WiFi 后 IP 可能变，以每次启动打印的地址为准。
 
@@ -80,7 +80,7 @@ docker compose build && docker compose up -d     # 或重启 python server.py
 ```bash
 python tools/reset_password.py 用户名
 # Docker：
-docker compose exec proficiency python tools/reset_password.py 用户名
+docker compose exec guide python tools/reset_password.py 用户名
 ```
 
 交互输入新密码；该账号所有旧会话立即失效。没有邮箱找回，这是唯一方式。
