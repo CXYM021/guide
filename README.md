@@ -220,7 +220,7 @@ tools/reset_password.py
 
 ## English
 
-**Proficiency** is a self-hosted skill-progress tracker for people who are tired of streak
+**Guide** (向导) is a self-hosted skill-progress journal for people who are tired of streak
 counters. Seven built-in skills plus user-defined ones, eight levels, and a scoring model that
 only counts *valid* practice: low quality, repeated easy tasks, and mechanical repetition are
 rejected; retention decays with idle time; level-ups require recent quality, at least one

@@ -1,5 +1,16 @@
 # 变更记录
 
+## 1.0.8 — 2026-11-13
+
+改名为 **向导（熟练度系统） / Guide**，功能与 1.0.7 相同。
+
+- 页面标题「向导 · 修行录」；接口标识 `guide-web/1.0.8`；exe 与压缩包改名为
+  `guide-web.exe` / `guide-web-win64.zip` / `guide-system-1.0.8.zip`。
+- 仓库地址改为 `CXYM021/guide`（旧地址由 GitHub 自动跳转）。
+- Service Worker 缓存前缀、备份文件名、本地捕获键名一并改为 `guide`。
+- exe 在目录不可写时改用 `%LOCALAPPDATA%\guide-web`，并自动搬迁旧的
+  `proficiency-web` 目录，升级不会丢数据。
+
 ## 1.0.7 — 2026-11-13
 
 - **记录抽屉直接显示「这个数怎么数」**：主动使用新表达、听者可理解度、
