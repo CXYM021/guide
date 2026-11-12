@@ -14,6 +14,9 @@
   不再依赖反向代理——本机 / 局域网裸跑也有。
 - **可执行位**：`start.sh` / `start_lan.sh` 在 git 索引里是 100644，
   Linux / macOS 用户 clone 后 `./start.sh` 会 Permission denied；改成 100755。
+- **时区提示**：默认按 UTC+8 记日。今日页会对比浏览器时区，不一致时给一条
+  「本机时区 UTC-5，当前按 UTC+8 记日」的提示，一键切换（只重算日序号，
+  不改经验）；「保持当前」记在 localStorage，不再反复弹。
 - README：目录树把 `custom_skills.py` / `skill_forge.py` 放回仓库根、补 `console.py`，
   测试数 60 → 61，补 Windows 未签名 exe 的 SmartScreen 提示。
 

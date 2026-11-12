@@ -369,6 +369,15 @@
         <div class="m">不用追求一次练很久。系统记的是「能不能用、比上次好多少」，不是打卡次数。</div>
       </div>
 
+      <div class="reco" id="tz-hint" style="display:none"><div class="k">日 历 口 径</div>
+        <div class="t" id="tz-hint-title">-</div>
+        <div class="g" id="tz-hint-body">「今日所得」「连胜」「同日递减」都按日历日算。换成本机时区更贴合你的作息：只按事件日志重算日序号，不改经验、不改等级。</div>
+        <div class="row" style="margin-top:8px">
+          <button class="mini pri" id="tz-hint-apply">用 本 机 时 区</button>
+          <button class="mini" id="tz-hint-later">保 持 当 前</button>
+        </div>
+      </div>
+
       <div class="section-title"><span>今 日 主 线 · 七 艺</span><small id="skill-count">按境界排列</small></div>
       <div id="skills"></div>
       <div class="whisper" id="milestone-note">本级里程碑：30% / 60% / 100%</div>
@@ -610,6 +619,12 @@ const ICON_FLAME = '<svg viewBox="0 0 24 24"><path d="M12 2c1 4-3 5-3 9 0 1.5.8 
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
+function tzText(sec) {
+  const sign = sec < 0 ? '-' : '+';
+  const m = Math.abs(Number(sec)) / 60;
+  const h = Math.floor(m / 60), mm = Math.round(m % 60);
+  return sign + h + (mm ? ':' + String(mm).padStart(2, '0') : '');
+}
 function toast(msg) {
   const el = $('toast'); el.textContent = msg; el.classList.add('on');
   clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('on'), 2800);
@@ -755,6 +770,18 @@ function renderToday(d) {
   $('status-right').textContent = '本地 · ' + (d.verify.length ? '自检异常' : '自检正常');
   // 一次都还没记过时，先把「第一步做什么」说清楚；记录一次后自动收起。
   $('onboard').style.display = (d.achievement_context.sessions || 0) ? 'none' : '';
+
+  // 时区提示：默认按 UTC+8 记日，人在别的时区会差半天。
+  const tzOff = Number((d.timezone || {}).offset_seconds);
+  const localOff = -(new Date().getTimezoneOffset()) * 60;
+  let tzDismissed = false;
+  try { tzDismissed = localStorage.getItem('tz-hint-off') === String(localOff); } catch (e) {}
+  const tzMismatch = Number.isFinite(tzOff) && localOff !== tzOff && !tzDismissed;
+  $('tz-hint').style.display = tzMismatch ? '' : 'none';
+  if (tzMismatch) {
+    $('tz-hint-title').textContent = '本机时区 UTC' + tzText(localOff) +
+      '，当前按 UTC' + tzText(tzOff) + ' 记日';
+  }
 
   renderRecommendation(d);
   $('skills').innerHTML = d.skills.map(s => {
@@ -1592,6 +1619,14 @@ $('bench-create').onclick = () => {
 };
 $('tz-apply').onclick = () => post('/api/settings',
   { tz_offset_seconds: Number($('tz-select').value) }, '时区已更新');
+$('tz-hint-apply').onclick = () => post('/api/settings',
+  { tz_offset_seconds: -(new Date().getTimezoneOffset()) * 60 },
+  '已按本机时区记日');
+$('tz-hint-later').onclick = () => {
+  const off = -(new Date().getTimezoneOffset()) * 60;
+  try { localStorage.setItem('tz-hint-off', String(off)); } catch (e) {}
+  $('tz-hint').style.display = 'none';
+};
 $('data-export').onclick = async () => {
   try {
     const b = await api('/api/export');
