@@ -22,6 +22,12 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
+ENGINE_DIR = Path(__file__).resolve().parent / "engine"
+if str(ENGINE_DIR) not in sys.path:
+    sys.path.insert(0, str(ENGINE_DIR))
+
+import console  # noqa: E402,F401 - 导入即把控制台切成 UTF-8
+
 DEFAULT_CONFIG = {
     "host": "127.0.0.1",
     "port": 8765,
@@ -106,11 +112,6 @@ def open_when_ready(url: str) -> None:
 
 
 def main() -> None:
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    except (AttributeError, OSError):
-        pass
-
     # 让服务端的「怎样允许他人访问」提示说 exe 的做法（改 config.json），
     # 而不是源码版才有的 start_lan.bat。
     os.environ["PROF_EXE_MODE"] = "1"

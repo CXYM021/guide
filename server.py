@@ -26,6 +26,7 @@ ENGINE_DIR = HERE / "engine"
 if str(ENGINE_DIR) not in sys.path:
     sys.path.insert(0, str(ENGINE_DIR))
 
+import console  # noqa: E402,F401 - 导入即把控制台切成 UTF-8
 import web_app  # noqa: E402
 from proficiency import SCHEMA_VERSION  # noqa: E402
 from auth import AuthError, AuthStore  # noqa: E402

@@ -25,6 +25,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import console  # noqa: F401,E402 - 导入即把控制台切成 UTF-8（中文提示在 cp1252 下不会崩）
+
 from proficiency import (
     SCHEMA_VERSION, JsonFileStorage, PowerRule, ProficiencySystem, SkillConfig,
     register_custom_rule,
@@ -1328,7 +1330,7 @@ def main() -> None:
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     url = f"http://127.0.0.1:{port}/"
     print(f"熟练度系统网页版已启动: {url}")
-    print(f"存档位置: {STATE["paths"]["save"]}")
+    print(f"存档位置: {STATE['paths']['save']}")
     print("按 Ctrl+C 停止服务")
     if "--no-browser" not in sys.argv:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
