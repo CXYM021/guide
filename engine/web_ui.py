@@ -340,8 +340,9 @@ HTML_PAGE = r"""<!DOCTYPE html>
         <div class="cap-row">
           <select id="cap-skill"></select>
           <button class="cap-btn" id="cap-toggle">开 工</button>
+          <button class="mini" id="cap-manual" title="人在外面练、没开页面时用这个">补 记 一 次</button>
         </div>
-        <div class="cap-note" id="cap-note">只记录「这个页面在前台多久」，不读手机屏幕、不知道你开了哪个 App。时长不会自己变成熟练度；收工后按技能出一份结算问卷，每题已默认选中，可一键确认。</div>
+        <div class="cap-note" id="cap-note">只算「这个页面在前台」的时间：切到别的软件还在计时，但最小化、锁屏、切到别的标签页会暂停，回来会告诉你停了几分钟。人在外面练，用「补记一次」。时长不会自己变成熟练度，收工后按技能出一份结算问卷。</div>
         <div class="cap-list" id="cap-list"></div>
       </div>
 
@@ -1378,6 +1379,20 @@ function capSave(v) {
     else localStorage.removeItem(CAP_KEY);
   } catch (e) { /* 存储不可用时退化为当前页面内计时，不谎称后台监控 */ }
 }
+function capHiddenSeconds(st, nowMs) {
+  if (!st || !st.startedMs) return 0;
+  let hidden = 0;
+  (st.hidden || []).forEach(iv => {
+    const a = Number(iv[0]) || 0, b = Number(iv[1]) || 0;
+    hidden += Math.max(0, b - a) * 1000;
+  });
+  if (st.hiddenFromMs != null) hidden += Math.max(0, nowMs - st.hiddenFromMs);
+  return hidden / 1000;
+}
+function capForegroundSeconds(st, nowMs) {
+  if (!st || !st.startedMs) return 0;
+  return Math.max(0, (nowMs - st.startedMs) / 1000 - capHiddenSeconds(st, nowMs));
+}
 function capIntervals() {
   const st = capLocal();
   if (!st || !st.sessionId) return [];
@@ -1388,16 +1403,31 @@ function capIntervals() {
   }
   return list.filter(x => x[1] > x[0]);
 }
+$('cap-manual').onclick = () => {
+  const pick = $('cap-skill').value;
+  openSheet(pick || undefined);
+  const note = $('p-note');
+  if (note && !note.value) note.placeholder = '补记：练了什么、多长、怎么判断做得对';
+};
+setInterval(() => {
+  const st = capLocal();
+  if (st && st.sessionId && captureData && (captureData.active || []).length) renderCapture(captureData);
+}, 20000);
 document.addEventListener('visibilitychange', () => {
   const st = capLocal();
   if (!st || !st.sessionId) return;
   if (document.hidden) {
     if (st.hiddenFromMs == null) st.hiddenFromMs = Date.now();
   } else if (st.hiddenFromMs != null) {
+    const awaySec = Math.max(0, Math.round((Date.now() - st.hiddenFromMs) / 1000));
     (st.hidden = st.hidden || []).push([
       Math.max(0, Math.round((st.hiddenFromMs - st.startedMs) / 1000)),
       Math.max(0, Math.round((Date.now() - st.startedMs) / 1000))]);
     st.hiddenFromMs = null;
+    if (awaySec >= 60) {
+      toast('刚才 ' + Math.round(awaySec / 60) + ' 分钟页面不在前台，没有计入');
+    }
+    if (captureData) renderCapture(captureData);
   }
   capSave(st);
 });
@@ -1423,16 +1453,17 @@ function renderCapture(d) {
   if (active) {
     $('cap-badge').innerHTML = '<span class="cap-pill">挂 机 中</span>';
     btn.textContent = '收 工'; btn.classList.add('stop');
-    const mins = Math.max(0, Math.floor(
-      (Date.now() - (st && st.sessionId === active.id ? st.startedMs : Date.now())) / 60000));
-    $('cap-note').textContent = '本页在前台约 ' + mins +
-      ' 分钟。重新打开页面会自动收口成待确认小票；时长不折算经验，不读手机屏幕、不知道前台 App。';
+    const fg = st && st.sessionId === active.id ? capForegroundSeconds(st, Date.now()) : 0;
+    const mm = Math.floor(fg / 60), ss = Math.floor(fg % 60);
+    const paused = document.hidden ? '（已暂停：页面不在前台）' : '';
+    $('cap-note').textContent = '已计前台 ' + mm + ' 分 ' + ss + ' 秒' + paused +
+      '。最小化 / 锁屏 / 切标签页会暂停；重新打开页面会自动收口成待确认小票。时长不折算经验。';
   } else {
     $('cap-badge').textContent = '未开工';
     btn.textContent = '开 工'; btn.classList.remove('stop');
-    $('cap-note').textContent = '只记录「这个页面在前台多久」，不读手机屏幕、' +
-      '不知道你开了哪个 App。时长不会自己变成熟练度；收工后按技能出一份结算问卷，' +
-      '每题已默认选中，可一键确认。';
+    $('cap-note').textContent = '只算「这个页面在前台」的时间：切到别的软件还在计时，' +
+      '但最小化、锁屏、切到别的标签页会暂停，回来会告诉你停了几分钟。人在外面练，' +
+      '用「补记一次」。时长不会自己变成熟练度。';
   }
   const pending = captureData.pending || [];
   $('cap-list').innerHTML = pending.map(s => {
