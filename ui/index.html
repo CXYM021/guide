@@ -299,7 +299,7 @@
   .qfoot { font-size: 10.5px; color: var(--muted); line-height: 1.7; margin-top: 8px;
            border-left: 2px solid var(--line); padding-left: 9px; }
 </style>
-<script>window.__PRODUCT_AUTH__ = true; window.__APP_VERSION__ = "1.0.8";</script>
+<script>window.__PRODUCT_AUTH__ = true; window.__APP_VERSION__ = "1.0.9";</script>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="icon" type="image/png" href="/icon-192.png">
@@ -371,6 +371,17 @@
         ② 难度照实选 3 左右；质量照实填；有别人指出问题时反馈选「他人点评」。<br>
         ③ 提交后看「本次增益拆解」，哪一项最短，下一次就补哪一项。</div>
         <div class="m">不用追求一次练很久。系统记的是「能不能用、比上次好多少」，不是打卡次数。</div>
+      </div>
+
+      <div class="reco" id="time-warn" style="display:none"><div class="k">时 间 检 查</div>
+        <div class="t" id="time-warn-title">-</div>
+        <div class="g" id="time-warn-body">你的设备时间被改到过未来（或时区改错过），存档里有几条记录的时间比现在晚。
+        「今日所得」「连胜」都按设备时间算，所以会停在原地等那一天到来——不是经验丢了。
+        下面的按钮只改这些记录的时间戳，经验、次数、等级一律不动。</div>
+        <div class="row" style="margin-top:8px">
+          <button class="mini pri" id="time-fix">拉 回 现 在</button>
+          <button class="mini" id="time-warn-later">稍 后 再 说</button>
+        </div>
       </div>
 
       <div class="reco" id="tz-hint" style="display:none"><div class="k">日 历 口 径</div>
@@ -650,6 +661,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 let rulesData = null, skillData = null, decData = null, counter = 0, toastTimer = null;
+let timeWarnStamp = 0;
 const ICON_FLAME = '<svg viewBox="0 0 24 24"><path d="M12 2c1 4-3 5-3 9 0 1.5.8 2.6 2 3.2-.3-2 .7-3.4 2-4.6.4 2.4 2.6 3 2.6 5.4A5.6 5.6 0 0 1 12 21a5.6 5.6 0 0 1-5.6-5.6C6.4 10 10 8.6 12 2z"/></svg>';
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
@@ -685,10 +697,19 @@ function fold(title, body, open) {
   return '<details' + (open ? ' open' : '') + '><summary>' + esc(title) + '</summary>' +
     '<div class="dbody">' + body + '</div></details>';
 }
+/* 时间一律按本机时区显示：存档里是 Unix 秒，用户看到的应该是自己钟表上的时间。 */
 function ts(unix) {
   const d = new Date(unix * 1000);
-  return (d.getUTCMonth() + 1) + '/' + d.getUTCDate() + ' ' +
-    String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0') + ' UTC';
+  const p = n => String(n).padStart(2, '0');
+  return (d.getMonth() + 1) + '/' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function tsAgo(unix, now) {
+  const diff = Math.round((now || Date.now() / 1000) - unix);
+  if (diff < -300) {
+    const ahead = Math.ceil(-diff / 86400);
+    return '时间在未来' + (ahead > 1 ? '（约 ' + ahead + ' 天）' : '');
+  }
+  return '';
 }
 
 /* ---------------- 页签 ---------------- */
@@ -816,6 +837,18 @@ function renderToday(d) {
   if (tzMismatch) {
     $('tz-hint-title').textContent = '本机时区 UTC' + tzText(localOff) +
       '，当前按 UTC' + tzText(tzOff) + ' 记日';
+  }
+
+  // 时间检查：有记录落在未来时，「今日」永远等不到那天，今日所得与连胜会卡住。
+  const tc = d.time_check || {};
+  timeWarnStamp = Number(tc.last_at || 0);
+  let timeLater = false;
+  try { timeLater = localStorage.getItem('time-warn-off') === String(timeWarnStamp); } catch (e) {}
+  const timeWarn = Number(tc.count || 0) > 0 && !timeLater;
+  $('time-warn').style.display = timeWarn ? '' : 'none';
+  if (timeWarn) {
+    $('time-warn-title').textContent = tc.count + ' 条记录的时间在未来（最近一条 ' +
+      ts(tc.last_at) + '），比现在晚了约 ' + (tc.ahead_days || 1) + ' 天';
   }
 
   renderRecommendation(d);
@@ -956,12 +989,15 @@ function renderJourney(d) {
     Math.max(2, Math.round(x.xp / max * 100)) + '%" title="' + x.xp + ' 点"></i>').join('');
   $('stat-total').textContent = (d.stats ? d.stats.total_xp : 0) + ' 点';
 
+  // 日序号必须和后端同一个口径（按设置里的时区偏移），否则 14 天条会错一格。
+  const dayTz = Number((d.timezone || {}).offset_seconds) || 0;
+  const dayOf = unix => Math.floor((unix + dayTz) / 86400);
   const byDay = {};
   (d.events || []).forEach(e => {
-    const day = Math.floor(e.at / 86400);
+    const day = dayOf(e.at);
     if (e.delta > 0) byDay[day] = (byDay[day] || 0) + e.delta;
   });
-  const today = Math.floor((d.clock ? d.clock.unix : Date.now() / 1000) / 86400);
+  const today = dayOf(d.clock ? d.clock.unix : Date.now() / 1000);
   $('days').innerHTML = Array.from({ length: 14 }, (_, i) => {
     const day = today - 13 + i;
     return '<i class="' + (byDay[day] ? 'hot' : '') + '">' + (day % 100) + '</i>';
@@ -985,7 +1021,9 @@ function renderJourney(d) {
     '<b>' + esc(e.skill_id) + '</b> · ' + (names[e.kind] || e.kind) +
     (e.delta > 0 ? ' <span class="note-ok">+' + e.delta + '</span>' :
       (e.delta < 0 ? ' <span class="note-bad">' + e.delta + '</span>' : '')) +
-    '<div class="t">' + ts(e.at) + (e.task_key && e.kind === 'practice' ? ' · ' + esc(e.task_key) : '') +
+    '<div class="t">' + ts(e.at) +
+    (tsAgo(e.at, d.clock && d.clock.unix) ? ' · ' + tsAgo(e.at, d.clock && d.clock.unix) : '') +
+    (e.task_key && e.kind === 'practice' ? ' · ' + esc(e.task_key) : '') +
     (e.reason_code && e.kind !== 'practice' ? ' · ' + esc(e.reason_code) : '') + '</div></li>').join('')
     : '<li>还没有记录。完成第一次修行后会在这里出现。</li>';
   renderTaskTimeline(d);
@@ -1310,6 +1348,26 @@ $('open-sheet').onclick = () => openSheet();
 const CAP_KEY = 'guide_capture_v1';
 let captureData = null, settleSession = null, settleFields = null;
 
+/* 小票为什么没被收下：把原因码翻成人话，并带上这次的秒数。 */
+function capRules() { return (captureData && captureData.rules) || {}; }
+function capReasonText(row) {
+  if (!row) return '';
+  const r = String(row.reason || '');
+  const vis = Number(row.visible_seconds || 0);
+  const dur = Number(row.duration_seconds || 0);
+  const min = Number(capRules().min_session_seconds || 60);
+  const maxH = Math.round(Number(capRules().max_session_seconds || 21600) / 3600);
+  const maxP = Number(capRules().max_pending || 20);
+  if (r === 'TOO_LITTLE_VISIBLE')
+    return '页面在前台只有 ' + vis + ' 秒，至少 ' + min + ' 秒才算（切走页面、锁屏的时间不算）';
+  if (r === 'TOO_SHORT') return '这次只有 ' + dur + ' 秒，少于 ' + min + ' 秒';
+  if (r === 'OVER_MAX_SESSION') return '单次超过 ' + maxH + ' 小时，不能入账';
+  if (r === 'TOO_MANY_PENDING') return '待确认的小票已有 ' + maxP + ' 张，先处理几张';
+  if (r === 'USER_DECLINED') return '你在结算里选了「这次不算」';
+  if (r === 'USER_DISCARDED') return '你主动丢弃了这张小票';
+  return '原因码 ' + (r || row.status || '未知');
+}
+
 function capLocal() {
   try { return JSON.parse(localStorage.getItem(CAP_KEY) || 'null'); }
   catch (e) { return null; }
@@ -1420,8 +1478,9 @@ async function capStop() {
     capSave(null);
     render(data);
     const r = data.capture_session;
-    toast(r.status === 'pending' ? '已收口，点小票确认一下'
-      : ('小票作废：' + (r.reason || r.status)));
+    toast(r.status === 'pending'
+      ? ('已收口，点了才能入账（前台 ' + Number(r.visible_seconds || 0) + ' 秒）')
+      : ('这张没收下：' + (data.reason_text || capReasonText(r))));
   } catch (e) { toast('收口失败：' + e.message); }
 }
 $('cap-toggle').onclick = () => {
@@ -1532,30 +1591,35 @@ function bindSettleInputs() {
     el.oninput = () => { settleFields[el.dataset.fkey] = el.value; };
   });
 }
+async function settleNow(body, okMsg) {
+  try {
+    const data = await api('/api/capture/settle', body);
+    const row = data.capture_session || {};
+    render(data);
+    if (row.status === 'rejected') {
+      toast('没有入账：' + (data.reason_text || capReasonText(row)));
+    } else {
+      toast(okMsg);
+    }
+    closeSettle();
+  } catch (e) { toast('结算失败：' + e.message); }
+}
 $('s-later').onclick = () => {
-  post('/api/capture/settle',
-    { session_id: settleSession.id, answers: { mode: 'form', confirm: 'later' } },
-    '小票已保留');
-  closeSettle();
+  settleNow({ session_id: settleSession.id,
+              answers: { mode: 'form', confirm: 'later' } }, '小票已保留');
 };
 $('s-discard').onclick = () => {
   post('/api/capture/discard', { session_id: settleSession.id }, '小票已丢弃');
   closeSettle();
 };
 $('s-reuse').onclick = () => {
-  post('/api/capture/settle', {
-    session_id: settleSession.id,
-    answers: { mode: 'reuse', confirm: 'yes', values: 'same' }
-  }, '小票已处理');
-  closeSettle();
+  settleNow({ session_id: settleSession.id,
+              answers: { mode: 'reuse', confirm: 'yes', values: 'same' } }, '小票已处理');
 };
 $('s-submit').onclick = () => {
-  post('/api/capture/settle', {
-    session_id: settleSession.id,
-    answers: { mode: 'form', confirm: 'yes',
-               fields: Object.assign({}, settleFields) }
-  }, '小票已处理');
-  closeSettle();
+  settleNow({ session_id: settleSession.id,
+              answers: { mode: 'form', confirm: 'yes',
+                         fields: Object.assign({}, settleFields) } }, '小票已处理');
 };
 
 /* ---------------- 基准复测 / 数据主权 / 时区 ---------------- */
@@ -1618,6 +1682,20 @@ $('tz-hint-later').onclick = () => {
   const off = -(new Date().getTimezoneOffset()) * 60;
   try { localStorage.setItem('tz-hint-off', String(off)); } catch (e) {}
   $('tz-hint').style.display = 'none';
+};
+$('time-fix').onclick = async () => {
+  try {
+    const res = await api('/api/time-repair', {});
+    const info = res.time_repair || {};
+    render(res);
+    toast(info.changed
+      ? ('已把 ' + info.changed + ' 条记录的时间拉回现在，经验不变')
+      : '没有需要修的时间');
+  } catch (e) { toast('修复失败：' + e.message); }
+};
+$('time-warn-later').onclick = () => {
+  try { localStorage.setItem('time-warn-off', String(timeWarnStamp)); } catch (e) {}
+  $('time-warn').style.display = 'none';
 };
 $('data-export').onclick = async () => {
   try {

@@ -43,6 +43,30 @@ from realistic_rules import (
 )
 from benchmark import BenchmarkLedger
 from capture_ledger import CaptureLedger, NOTE_TAG_PREFIX
+
+def capture_reason_text(row: dict) -> str:
+    """采集小票的「为什么没收下」：带具体秒数，不再只回一个原因码。"""
+    reason = str(row.get("reason") or "")
+    visible = int(row.get("visible_seconds") or 0)
+    duration = int(row.get("duration_seconds") or 0)
+    rules = getattr(STATE["capture"], "rules", {}) or {}
+    min_sec = int(rules.get("min_session_seconds", 60) or 60)
+    max_sec = int(rules.get("max_session_seconds", 21600) or 21600)
+    max_pending = int(rules.get("max_pending", 20) or 20)
+    if reason == "TOO_LITTLE_VISIBLE":
+        return (f"页面在前台只有 {visible} 秒，至少 {min_sec} 秒才算"
+                "（切走页面、锁屏的时间不算）")
+    if reason == "TOO_SHORT":
+        return f"这次只有 {duration} 秒，少于 {min_sec} 秒，不够一次有效记录"
+    if reason == "OVER_MAX_SESSION":
+        return f"单次超过 {max_sec // 3600} 小时，不能入账；休息一下重开"
+    if reason == "TOO_MANY_PENDING":
+        return f"待确认的小票已有 {max_pending} 张，先处理几张"
+    if reason == "USER_DECLINED":
+        return "你在结算里选了「这次不算」"
+    if reason == "USER_DISCARDED":
+        return "你主动丢弃了这张小票"
+    return ""
 from data_vault import (
     daily_backup, export_bundle, make_backup, validate_bundle, write_bundle,
 )
@@ -991,6 +1015,15 @@ def apply_baseline(body: dict) -> dict:
     return out
 
 
+def repair_time(body: dict | None = None) -> dict:
+    """时钟自救：把落在未来的记录时间拉回现在。只改时间，不改经验。"""
+    system: ProficiencySystem = STATE["system"]
+    info = system.repair_future_timestamps(now=STATE["clock"]())
+    out = skill_payload()
+    out["time_repair"] = info
+    return out
+
+
 def skill_payload() -> dict:
     system: ProficiencySystem = STATE["system"]
     order = {name: i for i, name in enumerate(DEFAULT_SKILLS)}
@@ -1045,6 +1078,7 @@ def skill_payload() -> dict:
         "recent_events": list(RECENT_EVENTS),
         "recent_verdicts": list(RECENT_VERDICTS),
         "verify": system.verify(),
+        "time_check": system.future_events(now=now),
         "save_path": str(STATE["paths"]["save"]),
         "clock": {"unix": now, "offset_days": round(STATE["clock"].offset / DAY_SECONDS, 2)},
         "timezone": {
@@ -1095,6 +1129,7 @@ def handle_capture(action: str, body: dict) -> dict:
                           level=level, now=now, **form_args)
         out = skill_payload()
         out["capture_session"] = row
+        out["reason_text"] = capture_reason_text(row)
         return out
     if action == "discard":
         row = ledger.discard(str(body["session_id"]))
@@ -1117,6 +1152,9 @@ def handle_capture(action: str, body: dict) -> dict:
         )
         out = inner if inner else skill_payload()
         out["capture_session"] = row
+        reason = str(row.get("reason", ""))
+        out["reason_text"] = (capture_reason_text(row)
+                              or REASON_CODES.get(reason, ""))
         # 结算状态在 submit_practice 之后才落定，这里刷新一次小票快照。
         out["capture"] = capture_payload()
         return out
@@ -1194,6 +1232,9 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 if method == "POST" and path == "/api/baseline":
                     self._send(200, apply_baseline(self._read_json()))
+                    return
+                if method == "POST" and path == "/api/time-repair":
+                    self._send(200, repair_time(self._read_json()))
                     return
                 if method == "GET" and path == "/api/checkpoint":
                     qs = parse_qs(urlparse(self.path).query)

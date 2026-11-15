@@ -148,9 +148,10 @@ API 不接受 `user_id` 参数，只从会话解析。
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/api/skills` | 全量 payload（技能、事件、成就、推荐、问卷待办、时钟…） |
+| GET | `/api/skills` | 全量 payload（技能、事件、成就、推荐、问卷待办、时钟、`time_check`…） |
 | GET | `/api/surveys` | 首登问卷与当次问卷题面 |
 | POST | `/api/baseline` | 提交首登自评，设置起点等级 |
+| POST | `/api/time-repair` | 把落在未来的记录时间拉回现在（只改时间戳，不改经验） |
 | POST | `/api/practice` | 记录一次练习（可带 `survey` 答案） |
 | GET/POST | `/api/skills/custom`、`/api/skills/custom/add|remove` | 自定义技能 |
 | GET | `/api/rules`、`/api/decisions` | 规则表与已拍板决策 |

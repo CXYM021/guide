@@ -2098,6 +2098,72 @@ class ProficiencySystem:
             })
             return state
 
+    def future_events(self, *, now: int | None = None,
+                      tolerance: int = 300) -> dict:
+        """找出时间戳明显晚于「现在」的记录。只读，不改任何状态。
+
+        设备时钟被前拨（或时区改错）时，记录会落在未来。它们照样计入累计，
+        但「今日所得」「连胜」「衰减」都按设备时间算，于是会卡在「今天永远
+        到不了那一天」的状态。这里只报告，不动数据。
+        """
+        t = self._now(now)
+        tol = max(0, _require_int(tolerance, "tolerance", 0))
+        rows = sorted((e for e in self._events if int(e.at) > t + tol),
+                      key=lambda e: (int(e.at), int(e.seq)))
+        practices = [int(e.at) for e in self._events if e.kind == "practice"]
+        return {
+            "now": t,
+            "tolerance_seconds": tol,
+            "count": len(rows),
+            "first_at": int(rows[0].at) if rows else None,
+            "last_at": int(rows[-1].at) if rows else None,
+            "ahead_days": (((int(rows[-1].at) - t) + 86_399) // 86_400) if rows else 0,
+            "last_practice_at": max(practices) if practices else 0,
+            "current_days": int(self._streak.get("current_days", 0)),
+            "last_day": self._streak.get("last_day"),
+            "today_day": day_index(t, self._tz_offset),
+        }
+
+    def repair_future_timestamps(self, *, now: int | None = None,
+                                 tolerance: int = 300) -> dict:
+        """把落在未来的记录时间拉回「现在」，只改时间戳，不改经验。
+
+        经验、有效次数、质量累加、指标累计、事件数量一个都不动；改的是 at
+        以及由 at 派生的 last_practice_at / settled_at，然后按新时间戳重建
+        连胜。用于设备时间被前拨之后的自救：否则「今日」与连胜会一直卡住。
+        """
+        t = self._now(now)
+        tol = max(0, _require_int(tolerance, "tolerance", 0))
+        with self._lock:
+            future = sorted((e for e in self._events if int(e.at) > t + tol),
+                            key=lambda e: (int(e.at), int(e.seq)))
+            if not future:
+                return {"changed": 0, "from_at": None, "to_at": None,
+                        "streak": self.streak_info(now=t)}
+            start = t - len(future) - 1
+            fixed = {int(e.seq): start + i + 1 for i, e in enumerate(future)}
+            self._events = [replace(e, at=fixed.get(int(e.seq), int(e.at)))
+                            for e in self._events]
+            for sid, state in self._states.items():
+                ats = [int(e.at) for e in self._events
+                       if e.skill_id == sid and e.kind == "practice"]
+                state.last_practice_at = max(ats) if ats else 0
+                if state.settled_at > t:
+                    state.settled_at = t
+                state.level = self._derived_level(
+                    sid, state, state.settled_at or t)
+            self._streak = rebuild_streak(
+                self._events, tz_offset_seconds=self._tz_offset, now=t,
+                freeze_charges=self._streak.get("freeze_charges", 0))
+            self._streak["time_repaired"] = {
+                "moved": len(future),
+                "first_from": int(future[0].at),
+                "last_from": int(future[-1].at),
+            }
+            self._mark_dirty()
+            return {"changed": len(future), "from_at": int(future[0].at),
+                    "to_at": t - 1, "streak": self.streak_info(now=t)}
+
     def stats_summary(self, *, days: int = 30, now: int | None = None) -> dict:
         """近 N 个「本地日历日」的统计，全部由事件日志聚合，不另存汇总值。"""
         with self._lock:
