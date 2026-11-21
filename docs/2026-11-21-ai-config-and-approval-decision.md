@@ -300,7 +300,10 @@ L2（未开工）：
   （`mode` 参数）、`engine/web_app.py`（3 个接口 + 注入 config）、`engine/web_ui.py`
   （面板与文案）、`README.md`、`build_exe.py`（exe 内置说明）、`smoke_exe.py`、CI。
 - 版本 1.0.10 → **1.0.11**；exe 已重建并实跑冒烟。
-- 没有提交 git、没有打 tag、没有发 Release——等你确认后再做（命令见下）。
+- **已发布**：commit `4e50436`、tag `v1.0.11`、Release 挂
+  `guide-web-win64.zip` 与 `guide-system-1.0.11.zip`，CI 4/4 绿；
+  从 `releases/latest/download/` 重新下载的 zip 与本地 sha256 完全一致。
+  发布脚本：`dist/make_release_111.py`（tag 已存在时容忍 422，可重复执行核对部分）。
 - 四个预设端点没有逐个实连（手上没有可用钥匙）。
 - L2 / L3 的并发与缓存问题只写了方案，没测。
 - 已知取舍：密钥落盘是这次唯一的「退步」，用「只回掩码 + 单独文件 + env 优先」
