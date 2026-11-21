@@ -189,6 +189,15 @@ def run(zip_path: Path) -> None:
         acc = call(port1, "/api/access")[1]
         check("config.json" in acc.get("enable_lan_hint", ""),
               "exe 模式的他人访问提示指向 config.json")
+
+        code, ai_saved, _ = call(port1, "/api/ai/config", {
+            "endpoint": "https://api.deepseek.com", "model": "deepseek-chat",
+            "key": "sk-smoke-abcdef123456",
+        }, cookie=cookie)
+        check(code == 200 and ai_saved.get("configured")
+              and str(ai_saved.get("masked_key", "")).endswith("3456")
+              and "sk-smoke-abcdef123456" not in json.dumps(ai_saved),
+              "exe 内能保存 AI 钥匙且只回掩码（不泄漏明文）")
     finally:
         if p1 is not None:
             kill_tree(p1)
@@ -216,6 +225,11 @@ def run(zip_path: Path) -> None:
         check(code == 200 and any(x["skill_id"] == custom_name
                                   for x in custom2["skills"]),
               "重启后自定义技能定义与来源记录仍在")
+        code, ai2, _ = call(port2, "/api/ai/config", cookie=cookie)
+        check(code == 200 and ai2.get("configured")
+              and str(ai2.get("masked_key", "")).endswith("3456")
+              and any((root / "data" / "users").glob("*/ai_secret.json")),
+              "重启后 AI 配置仍在（钥匙确实落在该账号目录）")
     finally:
         if p2 is not None:
             kill_tree(p2)

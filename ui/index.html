@@ -299,7 +299,7 @@
   .qfoot { font-size: 10.5px; color: var(--muted); line-height: 1.7; margin-top: 8px;
            border-left: 2px solid var(--line); padding-left: 9px; }
 </style>
-<script>window.__PRODUCT_AUTH__ = true; window.__APP_VERSION__ = "1.0.10";</script>
+<script>window.__PRODUCT_AUTH__ = true; window.__APP_VERSION__ = "1.0.11";</script>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="icon" type="image/png" href="/icon-192.png">
@@ -473,27 +473,44 @@
         <div class="hero" style="padding:13px">
           <div class="kv" id="cs-ai">-</div>
           <details id="cs-ai-help" style="margin:6px 0">
-            <summary style="font-size:11.5px;color:var(--primary);cursor:pointer">怎么配置 AI（点开看步骤）</summary>
+            <summary style="font-size:11.5px;color:var(--primary);cursor:pointer">标准从哪来？（点开换一个来源）</summary>
             <div class="kv" style="margin-top:6px">
-              启动服务前设三个环境变量：PROF_AI_ENDPOINT（OpenAI 兼容的 chat/completions 地址）、
-              PROF_AI_KEY、PROF_AI_MODEL。Windows PowerShell 例：<br>
-              <code>$env:PROF_AI_ENDPOINT="https://api.example.com/v1/chat/completions"</code><br>
-              <code>$env:PROF_AI_KEY="sk-..."</code>
-              <code>$env:PROF_AI_MODEL="gpt-4o-mini"</code><br>
-              然后重新启动（exe 用户：在同一个 PowerShell 窗口里运行 exe）。
-              AI 只负责「把公开资料折算成等级要求」，判定仍按指标门；没配 AI 或调用失败会用本地模板，
-              并明确标注 ai_used=false，不会冒充 AI。
+              这一步是选配，<b>不配也能加技能</b>。<br>
+              · 不配：按你填的指标给一套「通用起步标准」，1 秒出、不联网，界面会明写「本地模板·未用过 AI」。<br>
+              · 配了：先上网查公开资料（考级大纲、行业标准这类），再让 AI 把资料折算成 LV1–LV8 的门槛，出处写进技能详情。<br>
+              · 两种都一样：平时练习的打分全在本地算，不会每次联网，练习记录不上传。
+            </div>
+            <div class="row" id="cs-ai-presets" style="margin-top:6px"></div>
+            <div class="kv" id="cs-ai-status-note" style="color:var(--muted)">当前：未配置（不需要配置也能加技能）</div>
+            <div class="row"><label>服务地址 <input id="cs-ai-endpoint" type="text" placeholder="https://api.deepseek.com"></label></div>
+            <div class="row"><label>模型名 <input id="cs-ai-model" type="text" placeholder="deepseek-chat"></label></div>
+            <div class="row"><label>钥匙 <input id="cs-ai-key" type="password" placeholder="sk-…（只存这台电脑）"></label></div>
+            <div class="row">
+              <button class="mini" id="cs-ai-test">测 试 一 下</button>
+              <button class="mini" id="cs-ai-save">保 存</button>
+              <button class="mini" id="cs-ai-clear">清 除 钥 匙</button>
+            </div>
+            <div class="kv" id="cs-ai-msg" style="min-height:18px"></div>
+            <div class="kv" style="color:var(--muted)">
+              三步配好（约 3 分钟）：① 选一个你已经在用的 AI 服务 ② 粘「钥匙」——在这个服务的
+              「控制台 → API Keys」里生成的一串 sk- 开头的字符 ③ 点「测试一下」，通过就保存。<br>
+              钥匙只存在这台电脑（data/ai_secret.json），界面只显示后 4 位。
+              不想让钥匙落盘，也可以整段跳过：不配 AI 一样能加技能，只是标准来自本地模板。
+              想改用环境变量代替，见 README 的「配 AI」一节。
             </div>
           </details>
           <div id="cs-list" style="margin:8px 0"></div>
-          <div class="hint" style="margin:8px 0 4px">新增技能：填名字与 1–5 个可观测指标（越高越好、整数）。未配置 AI 时按合法范围生成本地保守模板，不冒充 AI 判定；配置 AI 后会自动联网检索公开资料生成等级要求（也可以自己填参考网址）。</div>
+          <div class="hint" style="margin:8px 0 4px">填名字与 1–5 个能数出来的指标（例：每分钟打字数、连续正确天数、完整弹完的曲目数），越高越好、整数。</div>
           <div class="row"><label>技能名 <input id="cs-name" type="text" maxlength="24" placeholder="例：钢琴演奏"></label></div>
           <div id="cs-metrics"></div>
           <div class="row"><button class="mini" id="cs-add-metric">+ 添加指标</button></div>
-          <label style="display:block;font-size:11.5px;margin-top:6px">参考资料 URL（可选，最多 3 个，一行一个）
+          <label style="display:block;font-size:11.5px;margin-top:6px">参考网址（可选，最多 3 个，一行一个；配了 AI 又留空，会自动上网找资料）
             <textarea id="cs-urls" rows="2" style="width:100%;margin-top:4px" placeholder="https://example.org/grading-standard"></textarea></label>
           <div class="kv" id="cs-error" style="color:#d93025;min-height:18px"></div>
-          <button class="submit" id="cs-submit">生 成 并 添 加</button>
+          <button class="submit" id="cs-submit">直 接 用 通 用 标 准 添 加</button>
+          <div class="row" style="margin-top:6px">
+            <button class="mini" id="cs-submit-ai">用资料折算添加（需要先配好 AI）</button>
+          </div>
         </div>
       </div>
 
@@ -1856,10 +1873,23 @@ function renderCustomSkills(d) {
   block.style.display = '';
   const list = d.skills || [];
   $('cs-count').textContent = list.length + ' / ' + d.max_custom_skills;
-  $('cs-ai').textContent = d.ai && d.ai.configured
-    ? ('AI 已配置：' + d.ai.model + ' @ ' + d.ai.endpoint_host +
-       '；不填网址也会自动检索维基百科等公开资料，再让模型折算成 LV1–LV8 要求。')
-    : 'AI 未配置：新增技能使用本地保守模板（未联网、不冒充 AI 判定）。';
+  const ai = (typeof d.ai === 'object' && d.ai) ? d.ai : {};
+  $('cs-ai').innerHTML = ai.configured
+    ? ('标准来源：<b>公开资料折算 · ' + esc(ai.model) + '</b>（已就绪）<br>' +
+       (ai.source === 'env'
+         ? '取自环境变量：钥匙没有落盘。'
+         : '钥匙存在这台电脑上（界面只显示 ' + esc(ai.masked_key || '') + '），不会上传。') +
+       '练习打分一直在本地算，不会每次联网。')
+    : ('标准来源：<b>通用起步标准</b>（本地生成，1 秒，不联网）。' +
+       '想换成「有出处的标准」，点下面的「标准从哪来」。');
+  if (ai.presets) renderAiPresets(ai.presets);
+  $('cs-ai-key').placeholder = ai.masked_key
+    ? ('已保存 ' + ai.masked_key + '，留空就沿用')
+    : 'sk-…（只存这台电脑）';
+  $('cs-ai-status-note').textContent = ai.configured
+    ? ('当前：' + (ai.preset_label || '') + (ai.endpoint ? ' · ' + ai.endpoint : ''))
+    : '当前：未配置（不需要配置也能加技能）';
+  window.__csAi = ai;
   $('cs-list').innerHTML = list.length
     ? list.map(x => '<div class="kv" style="margin:4px 0">' +
         esc(x.skill_id) + ' · ' + x.metric_count + ' 项指标 · ' +
@@ -1879,13 +1909,70 @@ function renderCustomSkills(d) {
     };
   });
 }
+/* ---------------- 标准来源（可选配 AI） ---------------- */
+function renderAiPresets(presets) {
+  const box = $('cs-ai-presets');
+  if (!presets || !presets.length || box.dataset.ready === '1') return;
+  box.dataset.ready = '1';
+  presets.forEach(p => {
+    const b = document.createElement('button');
+    b.className = 'mini';
+    b.style.marginRight = '4px';
+    b.textContent = p.label;
+    b.onclick = () => {
+      $('cs-ai-endpoint').value = p.endpoint || '';
+      $('cs-ai-model').value = p.model || '';
+      aiMsg(p.hint ? ('已选 ' + p.label + '：' + p.hint + '。粘上钥匙，再点「测试一下」。')
+                   : ('已选 ' + p.label + '：粘上钥匙，再点「测试一下」。'));
+      $('cs-ai-key').focus();
+    };
+    box.appendChild(b);
+  });
+}
+function aiFormBody() {
+  return { endpoint: $('cs-ai-endpoint').value.trim(),
+           model: $('cs-ai-model').value.trim(),
+           key: $('cs-ai-key').value.trim() };
+}
+function aiMsg(text, tone) {
+  const el = $('cs-ai-msg');
+  el.textContent = text;
+  el.style.color = tone === 'ok' ? 'var(--ok)'
+    : (tone === 'bad' ? 'var(--bad)' : 'var(--muted)');
+}
+$('cs-ai-test').onclick = async () => {
+  aiMsg('正在连一次…');
+  try {
+    const d = await api('/api/ai/test', aiFormBody());
+    aiMsg(d.message || '通了', 'ok');
+  } catch (e) { aiMsg('没通：' + e.message, 'bad'); }
+};
+$('cs-ai-save').onclick = async () => {
+  try {
+    const d = await api('/api/ai/config', aiFormBody());
+    $('cs-ai-key').value = '';
+    aiMsg(d.configured
+      ? '已保存。现在可以「用资料折算添加」了。'
+      : '已保存，但还差一项（地址 / 模型 / 钥匙），点「测试一下」看差在哪。',
+      d.configured ? 'ok' : 'bad');
+    await refresh();
+  } catch (e) { aiMsg('存不下：' + e.message, 'bad'); }
+};
+$('cs-ai-clear').onclick = async () => {
+  if (!window.confirm('清除钥匙后，新增技能会回到「通用起步标准」。继续？')) return;
+  try {
+    await api('/api/ai/config', { clear_key: true });
+    await refresh();
+    aiMsg('钥匙已清除，回到通用起步标准。', 'ok');
+  } catch (e) { aiMsg('清除失败：' + e.message, 'bad'); }
+};
 $('cs-add-metric').onclick = () => {
   if ($('cs-metrics').querySelectorAll('.cs-metric').length >= 5) {
     toast('最多 5 个指标'); return;
   }
   csMetricRow();
 };
-$('cs-submit').onclick = async () => {
+async function addCustomSkill(mode) {
   const err = $('cs-error'); err.textContent = '';
   const name = $('cs-name').value.trim();
   const metrics = [];
@@ -1898,12 +1985,24 @@ $('cs-submit').onclick = async () => {
     .filter(Boolean).slice(0, 3);
   try {
     const d = await api('/api/skills/custom/add',
-      { name: name, metrics: metrics, source_urls: urls });
-    toast(d.provenance && d.provenance.ai_used
-      ? 'AI 依据资料生成并添加' : '已按本地保守模板添加');
+      { name: name, metrics: metrics, source_urls: urls, mode: mode });
+    toast(mode === 'local'
+      ? '已按通用起步标准添加（未联网）'
+      : (d.provenance && d.provenance.ai_used
+        ? 'AI 依据资料生成并添加'
+        : '已按本地模板添加（AI 没通，原因写在技能详情里）'));
     $('cs-name').value = ''; $('cs-urls').value = '';
     await refresh();
   } catch (e) { err.textContent = e.message; }
+}
+$('cs-submit').onclick = () => addCustomSkill('local');
+$('cs-submit-ai').onclick = () => {
+  const ai = window.__csAi || {};
+  if (!ai.configured) {
+    toast('还没配 AI：先点上面「标准从哪来」配一下，或者直接用左边的通用标准');
+    return;
+  }
+  addCustomSkill('auto');
 };
 if (!$('cs-metrics').querySelector('.cs-metric')) csMetricRow();
 

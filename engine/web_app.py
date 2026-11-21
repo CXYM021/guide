@@ -87,8 +87,9 @@ from custom_skills import (  # noqa: E402
     settlement_spec_for,
 )
 from skill_forge import (  # noqa: E402
-    ForgeError, VERIFIED_REFERENCES, ai_status, forge_skill_spec,
+    ForgeError, VERIFIED_REFERENCES, forge_skill_spec,
 )
+import profile_ai  # noqa: E402 - 标准来源配置：界面里填一次，env 优先
 
 # 迁移兼容：历史存档可能含命名自定义规则（存档只存规则名）。
 # 先注册同名实现才能加载；加载后 init_system() 会清理非 SKILL_IDS 的历史技能。
@@ -451,6 +452,11 @@ def custom_form_parts(skill_id: str):
     return registry.form_for(skill_id) if registry else None
 
 
+def _ai_cfg() -> dict:
+    """当前租户的标准来源配置（env 优先，其次本机 ai_secret.json）。"""
+    return profile_ai.load_ai_config(STATE["paths"]["data_dir"])
+
+
 def custom_skills_payload() -> dict:
     registry = STATE.get("custom")
     return {
@@ -458,18 +464,20 @@ def custom_skills_payload() -> dict:
         "skills": registry.public_list() if registry else [],
         "verify": registry.verify() if registry else [],
         "max_custom_skills": MAX_CUSTOM_SKILLS,
-        "ai": ai_status(),
+        "ai": profile_ai.public_status(_ai_cfg()),
         "verified_references": VERIFIED_REFERENCES,
         "builtin_skill_ids": list(SKILL_IDS),
-        "note": ("AI 需要部署方配置 OpenAI 兼容端点；未配置时使用本地保守模板，"
-                 "不会冒充 AI 联网判定。生成的规则落盘后按原纯函数判定。"),
+        "note": ("不配 AI 也能加技能：走通用起步标准，本地生成、不联网。"
+                 "配了之后先查公开资料再折算门槛，出处写进技能详情；"
+                 "无论哪种，练习打分都在本地算，规则落盘后按原纯函数判定。"),
     }
 
 
 def add_custom_skill(body: dict) -> dict:
     spec = forge_skill_spec(
         name=body.get("name"), metrics=body.get("metrics"),
-        source_urls=body.get("source_urls"), now=STATE["clock"]())
+        source_urls=body.get("source_urls"), now=STATE["clock"](),
+        config=_ai_cfg(), mode=str(body.get("mode") or "auto"))
     registry: CustomSkillRegistry = STATE["custom"]
     registry.add(spec)
     system: ProficiencySystem = STATE["system"]
@@ -1243,6 +1251,37 @@ class Handler(BaseHTTPRequestHandler):
                     return
                 if method == "POST" and path == "/api/checkpoint":
                     self._send(200, submit_checkpoint(self._read_json()))
+                    return
+                if path == "/api/ai/config" and method == "GET":
+                    self._send(200, profile_ai.config_payload(
+                        STATE["paths"]["data_dir"]))
+                    return
+                if path == "/api/ai/config" and method == "POST":
+                    body = self._read_json()
+                    try:
+                        if body.get("clear_key"):
+                            profile_ai.clear_ai_key(STATE["paths"]["data_dir"])
+                        else:
+                            profile_ai.save_ai_config(
+                                STATE["paths"]["data_dir"],
+                                preset=body.get("preset"),
+                                endpoint=body.get("endpoint"),
+                                model=body.get("model"), key=body.get("key"))
+                    except profile_ai.AiConfigError as exc:
+                        self._send(400, {"ok": False, "error": str(exc)})
+                        return
+                    self._send(200, profile_ai.config_payload(
+                        STATE["paths"]["data_dir"]))
+                    return
+                if path == "/api/ai/test" and method == "POST":
+                    body = self._read_json()
+                    cfg = _ai_cfg()
+                    for field in ("endpoint", "model", "key"):
+                        value = str(body.get(field) or "").strip()
+                        if value:
+                            cfg[field] = value
+                    result = profile_ai.test_ai_connection(cfg)
+                    self._send(200, {"ok": bool(result.get("ok")), **result})
                     return
                 if path == "/api/skills/custom" and method == "GET":
                     self._send(200, custom_skills_payload())

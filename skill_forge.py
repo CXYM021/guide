@@ -454,8 +454,13 @@ def ai_status() -> dict:
 
 def forge_skill_spec(*, name: object, metrics: object,
                      source_urls: object = None, now: int | None = None,
-                     config: dict | None = None) -> dict:
-    """生成一份可直接落盘的自定义技能规格。失败一律回退本地模板并写明原因。"""
+                     config: dict | None = None,
+                     mode: str = "auto") -> dict:
+    """生成一份可直接落盘的自定义技能规格。失败一律回退本地模板并写明原因。
+
+    mode="local"：用户主动选「通用起步标准」，直接走本地模板，一步也不联网。
+    mode="auto" ：配了 AI 就查资料折算；没配就照样回退本地模板。
+    """
     t = int(now if now is not None else time.time())
     skill_id = str(name or "").strip()
     if not (2 <= len(skill_id) <= 24):
@@ -463,6 +468,9 @@ def forge_skill_spec(*, name: object, metrics: object,
     if any(c in skill_id for c in "/\\<>\"'{}[]"):
         raise ForgeError("技能名不能包含路径或标记字符")
     base_metrics = _norm_metrics(metrics)
+    if str(mode or "auto").strip().lower() == "local":
+        return local_spec(skill_id, base_metrics, now=t,
+                          reason="按你的选择使用通用起步标准（未联网、未用过 AI）")
     cfg = _ai_config(config)
     urls = [str(u) for u in (source_urls or []) if str(u).strip()][:MAX_URLS]
 

@@ -37,4 +37,4 @@ jobs:
         run: python tools/check_ui.py
 
       - name: Packaging script compiles
-        run: python -m py_compile server.py auth.py tenant.py skill_forge.py custom_skills.py build_exe.py build_ui.py frozen_entry.py
+        run: python -m py_compile server.py auth.py tenant.py skill_forge.py custom_skills.py profile_ai.py build_exe.py build_ui.py frozen_entry.py
