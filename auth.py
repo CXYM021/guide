@@ -283,6 +283,20 @@ class AuthStore:
         return {"id": row[0], "username": row[1],
                 "created_at": row[2], "expires_at": row[3]}
 
+    def find_user(self, username: str) -> dict | None:
+        """按用户名找人（加好友用）。找不到返回 None，不抛错。"""
+        try:
+            key = username_key(username)
+        except AuthError:
+            return None
+        with self._session() as conn:
+            row = conn.execute(
+                "SELECT id, username, created_at FROM users WHERE username_key=?",
+                (key,)).fetchone()
+        if row is None:
+            return None
+        return {"id": row[0], "username": row[1], "created_at": row[2]}
+
     def logout(self, token: str | None) -> None:
         if not token:
             return

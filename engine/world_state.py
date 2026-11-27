@@ -348,6 +348,31 @@ class WorldState:
 
     # ---------- 写入 ----------
 
+    def guard_external(self, target: str, *, now: int, at_risk: bool,
+                       note: str = "") -> dict:
+        """给「真实好友」护道：目标不在这台机器的预置档案里。
+
+        风险由调用方按对方真实存档判定（今天没练 + 至少隔了一天），
+        这里只负责去重、每日上限与记账；不去改 actors 里的任何档案。
+        """
+        verdict = evaluate_deed(
+            kind="guard", actor_exists="player" in self._data["actors"],
+            target_exists=bool(str(target).strip()),
+            target_at_risk=bool(at_risk),
+            event_exists=False, event_is_practice=False,
+            dedupe_hit=self._dedupe_key("guard", str(target), now) in self._data["dedupe"],
+            day_reputation=self.day_reputation(now),
+            daily_cap=int(ALTRUISM_RULES["daily_reputation_cap"]),
+        )
+        if not verdict["valid"]:
+            return {"ok": False, "reason_code": verdict["reason_code"],
+                    "reputation": 0}
+        deed = self._append_deed(kind="guard", at=now, target=str(target),
+                                 reputation=verdict["reputation"], note=note)
+        self._mutate()
+        return {"ok": True, "reason_code": "OK", "deed": deed,
+                "reputation": verdict["reputation"]}
+
     def guard(self, target: str, *, now: int, note: str = "") -> dict:
         """护道：为「连胜确实处于风险中」的同门提供一次保护。"""
         actors = self._data["actors"]

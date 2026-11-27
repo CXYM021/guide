@@ -31,9 +31,10 @@ import web_app  # noqa: E402
 from proficiency import SCHEMA_VERSION  # noqa: E402
 from auth import AuthError, AuthStore  # noqa: E402
 from tenant import TenantManager  # noqa: E402
+from friends import MAX_FRIENDS, FriendError, FriendStore  # noqa: E402
 
 PRODUCT_NAME = "guide-web"
-PRODUCT_VERSION = "1.0.11"
+PRODUCT_VERSION = "1.0.12"
 
 # 不依赖反向代理也能拿到的安全响应头。Caddy 里还有一份更严的，
 # 但裸跑（本机 / 局域网）时这些必须由应用自己发。
@@ -218,6 +219,8 @@ class ProductHandler(web_app.Handler):
         tenant = self.server.tenants.get(user["id"])
         token = web_app.bind_tenant(tenant)
         try:
+            if path.startswith("/api/friends"):
+                return self._friends(method, path, user, tenant)
             return super()._handle(method)
         finally:
             web_app.reset_tenant(token)
@@ -284,6 +287,74 @@ class ProductHandler(web_app.Handler):
             "enable_lan_hint": lan_enable_hint(),
             "notes": notes,
         }
+
+    # ---------- 好友（同一台服务器上的真实账号） ----------
+
+    def _friends(self, method: str, path: str, user: dict, tenant: dict) -> None:
+        cfg = self.server.config
+        store: FriendStore = self.server.friends
+        users_root = Path(cfg["data_dir"]) / "users"
+        tz = int(cfg.get("default_tz_offset_seconds") or 0)
+        now = int(tenant["clock"]())
+
+        def cards() -> list[dict]:
+            return store.snapshot(user["id"], users_root=users_root,
+                                  now=now, tz_offset=tz)
+
+        def payload() -> dict:
+            return {
+                "ok": True,
+                "me": {"uid": user["id"], "username": user["username"]},
+                "friends": cards(),
+                "max_friends": MAX_FRIENDS,
+                "multi_user": int(self.server.auth.user_count()) > 1,
+                "note": ("好友是这台服务器上的真实账号：让对方先在这里注册，"
+                         "把用户名填进来就互相看得见「今天练没练」。"
+                         "没有好友时不会有模拟角色冒充真人。"),
+            }
+
+        if path == "/api/friends" and method == "GET":
+            return self._send(200, payload())
+        if method != "POST":
+            return self._send(405, {"ok": False, "error": "方法不允许"})
+        try:
+            body = self._read_json()
+            if path == "/api/friends/add":
+                target = self.server.auth.find_user(str(body.get("username") or ""))
+                if target is None:
+                    raise FriendError("没找到这个用户名：让对方先在这台服务器上"
+                                      "注册账号，再确认用户名没打错")
+                store.add(user["id"], user["username"], target["id"],
+                          target["username"], now=now)
+                return self._send(200, payload())
+            if path == "/api/friends/remove":
+                store.remove(user["id"], str(body.get("uid") or ""))
+                return self._send(200, payload())
+            if path == "/api/friends/guard":
+                uid = str(body.get("uid") or "")
+                card = {c["uid"]: c for c in cards()}.get(uid)
+                if card is None:
+                    raise FriendError("你们还不是好友")
+                if not card["needs_nudge"]:
+                    raise FriendError("他今天已经练过了，或者还没开始练——"
+                                      "现在提醒他没有意义")
+                result = tenant["world"].guard_external(
+                    f"friend:{uid}", now=now, at_risk=True,
+                    note=f"给好友「{card['name']}」护道")
+                if not result.get("ok"):
+                    hint = {"DUPLICATE": "今天已经给他护过道了",
+                            "DAILY_CAP": "今天的声望已经拿满，明天再来",
+                            }.get(str(result.get("reason_code")),
+                                  "这次没记上，稍后再试")
+                    raise FriendError(hint)
+                return self._send(200, {"reputation": result["reputation"],
+                                        **payload()})
+            return self._send(404, {"ok": False, "error": "未知好友接口"})
+        except FriendError as exc:
+            return self._send(400, {"ok": False, "error": str(exc)})
+        except (ValueError, TypeError, KeyError) as exc:
+            return self._send(400, {"ok": False,
+                                    "error": f"{type(exc).__name__}: {exc}"})
 
     def _serve_ui(self) -> None:
         self._send(200, self.server.ui_html.encode("utf-8"),
@@ -353,10 +424,12 @@ class ProductServer(ThreadingHTTPServer):
     allow_reuse_address = True
 
     def __init__(self, addr, handler, *, config: dict, auth: AuthStore,
-                 tenants: TenantManager, ui_html: str) -> None:
+                 tenants: TenantManager, ui_html: str,
+                 friends: FriendStore | None = None) -> None:
         self.config = config
         self.auth = auth
         self.tenants = tenants
+        self.friends = friends or FriendStore(config["data_dir"])
         self.ui_html = ui_html
         super().__init__(addr, handler)
 
@@ -376,6 +449,7 @@ def build_server(config: dict | None = None) -> ProductServer:
     ui_html = ui_path.read_text(encoding="utf-8")
     return ProductServer((cfg["host"], cfg["port"]), ProductHandler,
                          config=cfg, auth=auth, tenants=tenants,
+                         friends=FriendStore(cfg["data_dir"]),
                          ui_html=ui_html)
 
 

@@ -366,11 +366,17 @@ HTML_PAGE = r"""<!DOCTYPE html>
         <div class="fr" id="factors-rows"></div>
       </div>
 
-      <div class="reco" id="onboard" style="display:none"><div class="k">第 一 次 来</div>
+      <div class="reco" id="onboard" style="display:none"><div class="k">第 一 次 来 · 照 着 做 三 步</div>
         <div class="t" id="onboard-title">三步，把第一个技能从 0 推到有反馈</div>
         <div class="g" id="onboard-body">① 点下面的「记录一次修行」，技能先选英语口语或跑步技术。<br>
         ② 难度照实选 3 左右；质量照实填；有别人指出问题时反馈选「他人点评」。<br>
         ③ 提交后看「本次增益拆解」，哪一项最短，下一次就补哪一项。</div>
+        <div class="g" style="margin-top:6px;color:var(--muted)">看不懂的词：<b>熟练度</b>＝这个技能的综合战力；
+          <b>保持度</b>＝手感还热不热；<b>有效练习</b>＝能算分的练习。全部对照在「规则」页顶的「术语表」。</div>
+        <div class="row" style="margin-top:8px">
+          <button class="mini pri" id="onboard-go">去 记 录 一 次</button>
+          <button class="mini" id="onboard-close">知 道 了</button>
+        </div>
         <div class="m">不用追求一次练很久。系统记的是「能不能用、比上次好多少」，不是打卡次数。</div>
       </div>
 
@@ -421,9 +427,23 @@ HTML_PAGE = r"""<!DOCTYPE html>
         <div class="kv" id="wallet-hint" style="margin-top:7px">-</div>
       </div>
 
-      <div class="section-title"><span>同 门 残 影 · 护 道</span><small id="guild-qi">宗门气运 0</small></div>
-      <div class="scope-note" style="margin-bottom:9px">护道＝给一个「今天还没练、连胜要断」的同门留一句提醒，+30 声望；对方不是真人、不会回复，也不影响你自己的熟练度。同门按连胜天数从高到低排。</div>
-      <div id="peers"></div>
+      <div class="section-title"><span>我 的 好 友</span><small id="friend-count">0 人</small></div>
+      <div class="hero" style="padding:13px">
+        <div class="kv" id="friend-note">好友＝这台服务器上真实注册的另一个账号。加进来就能互相看见「今天练没练」，还能互相护道。</div>
+        <div class="row" style="margin-top:8px">
+          <label>用户名 <input id="friend-name" type="text" placeholder="对方的用户名"></label>
+          <button class="mini pri" id="friend-add">加 好 友</button>
+        </div>
+        <div class="kv" id="friend-msg" style="min-height:18px"></div>
+        <div id="friends" style="margin-top:6px"></div>
+      </div>
+
+      <details style="margin-top:10px">
+        <summary style="font-size:12px;color:var(--muted);cursor:pointer">练手样本（本机预置，不是真人、不会回复）</summary>
+        <div class="scope-note" style="margin:8px 0 6px">这三份是随程序附带的演示档案，用来熟悉护道与兑换怎么走。等你加了真实好友，就以好友为准；它们不会因为被护道而回你任何东西。</div>
+        <div class="section-title" style="margin-top:0"><span>样 本 · 护 道</span><small id="guild-qi">宗门气运 0</small></div>
+        <div id="peers"></div>
+      </details>
 
       <div class="section-title"><span>题 签 · 传 承</span><small>须锚定真实记录</small></div>
       <div class="hero" style="padding:13px">
@@ -443,6 +463,23 @@ HTML_PAGE = r"""<!DOCTYPE html>
     <!-- ============ 页 2：规则 ============ -->
     <section class="page" id="page-rules">
       <div class="section-title" style="margin-top:8px"><span>规 则 全 书</span><small>与代码同源</small></div>
+      <details id="glossary" style="margin:8px 0">
+        <summary style="font-size:12px;color:var(--primary);cursor:pointer">术语表：每个词一句白话（先看这个）</summary>
+        <div class="kv" style="margin-top:6px;line-height:1.85">
+          <b>熟练度</b>（综合战力）：一个技能的总分，LV1–LV8 就是按它排的。<br>
+          <b>保持度</b>（手感）：最近练没练。停久了会掉，重新练会慢慢回来，掉分是故意的。<br>
+          <b>有效练习</b>（能算分的练习）：质量够、难度不是一直挑最省事的、不是机械重复，才计入。<br>
+          <b>单次增益</b>（这次加了多少）：一次练习实际拿到的分，按难度、质量、反馈等拆开给你看。<br>
+          <b>达标门</b>（升级要过的关）：经验够了还要过「最近质量 + 客观度量 + 技能指标」三关才升级。<br>
+          <b>连胜</b>（连续多少天）：连续有有效练习的天数；中间断一天就归零。<br>
+          <b>连胜激冻</b>（断签保护券）：断一天时替你保一次连胜，用掉就没了。<br>
+          <b>声望</b>（做好事攒的分）：只有护道、题签、传承能拿，不能用钱买、也不能刷。<br>
+          <b>悟道卡</b>（下一次加倍券）：只放大下一次有效练习的收益，不改历史记录。<br>
+          <b>宗门气运</b>（这台机器上的总和）：所有档案的连胜天数加起来，只是气氛值，不参与判定。<br>
+          <b>基准复测</b>（隔 28 天再考一次）：只认客观度量，不写经验、不改保持度。<br>
+          <b>自定义技能</b>（自己加的科目）：内置七项之外，自己填指标与门槛。
+        </div>
+      </details>
       <div class="hint" id="disclaimer">-</div>
       <div id="rule-box"></div>
     </section>
@@ -843,7 +880,8 @@ function renderToday(d) {
   $('hero-sub').textContent = '七艺同修 · ' + (d.achievement_context.sessions || 0) + ' 次有效修行';
   $('status-right').textContent = '本地 · ' + (d.verify.length ? '自检异常' : '自检正常');
   // 一次都还没记过时，先把「第一步做什么」说清楚；记录一次后自动收起。
-  $('onboard').style.display = (d.achievement_context.sessions || 0) ? 'none' : '';
+  $('onboard').style.display =
+    (d.achievement_context.sessions || 0) || onboardDone() ? 'none' : '';
 
   // 时区提示：默认按 UTC+8 记日，人在别的时区会差半天。
   const tzOff = Number((d.timezone || {}).offset_seconds);
@@ -996,6 +1034,78 @@ $('do-share').onclick = () => {
     toast('这条不是有效练习，不能公开为范例'); return;
   }
   altruism('share', { target: Number(v) });
+};
+
+/* ---------------- 好友（同一台服务器上的真实账号） ---------------- */
+function onboardDone() {
+  try { return localStorage.getItem('guide-onboard-done') === '1'; }
+  catch (e) { return false; }
+}
+function friendLine(s) {
+  if (!s || !s.known) return '数据待同步（对方刚改过存档）';
+  if (s.practiced_today) return '今天练过了';
+  if (s.last_at == null) return '还没开始练';
+  return '已 ' + s.days_since + ' 天没练';
+}
+async function renderFriends() {
+  let d;
+  try { d = await api('/api/friends'); }
+  catch (e) {
+    $('friend-note').textContent = '好友功能读取失败：' + e.message;
+    return;
+  }
+  $('friend-count').textContent = (d.friends || []).length + ' / ' + d.max_friends;
+  $('friend-note').textContent = d.multi_user ? d.note
+    : '这台服务器上现在只有你一个账号。让家人/同事在同一台机器的局域网地址上注册一个，把用户名填进来就能互加好友。';
+  const list = d.friends || [];
+  $('friends').innerHTML = list.length
+    ? list.map(f => {
+        const s = f.summary || {};
+        const risky = !!f.needs_nudge;
+        return '<div class="peer' + (risky ? ' risk' : '') + '"><div>' +
+          '<div class="pn">' + esc(f.name) + ' · ' + esc(friendLine(s)) + '</div>' +
+          '<div class="pd">' + (s.event_count || 0) + ' 条练习记录 · ' +
+          '<button class="mini" data-friend-rm="' + esc(f.uid) + '">删好友</button></div></div>' +
+          '<button class="mini' + (risky ? ' pri' : '') + '" data-friend-guard="' +
+          esc(f.uid) + '"' + (risky ? '' : ' disabled') + '>护 道</button></div>';
+      }).join('')
+    : '<div class="kv">还没有好友。加一个真人才有动力——加不到的模拟角色，已经收进下面的「练手样本」里。</div>';
+  document.querySelectorAll('[data-friend-guard]').forEach(b => {
+    b.onclick = async () => {
+      try {
+        const r = await api('/api/friends/guard', { uid: b.dataset.friendGuard });
+        toast('护道成功，声望 +' + r.reputation);
+        await refresh();
+      } catch (e) { toast(e.message); }
+    };
+  });
+  document.querySelectorAll('[data-friend-rm]').forEach(b => {
+    b.onclick = async () => {
+      if (!window.confirm('删掉好友后，互相就看不到对方的练习情况了。继续？')) return;
+      try { await api('/api/friends/remove', { uid: b.dataset.friendRm }); renderFriends(); }
+      catch (e) { toast(e.message); }
+    };
+  });
+}
+$('friend-add').onclick = async () => {
+  const name = $('friend-name').value.trim();
+  if (!name) { toast('先填对方的用户名'); return; }
+  $('friend-msg').textContent = '';
+  try {
+    await api('/api/friends/add', { username: name });
+    $('friend-name').value = '';
+    $('friend-msg').textContent = '已加为好友（双向，对方那边也会看到你）。';
+    renderFriends();
+  } catch (e) { $('friend-msg').textContent = e.message; }
+};
+$('onboard-go').onclick = () => {
+  const skill = $('p-skill');
+  if (skill) { skill.scrollIntoView({ block: 'center' }); skill.focus(); }
+  toast('技能先选英语口语或跑步技术，难度选 3');
+};
+$('onboard-close').onclick = () => {
+  try { localStorage.setItem('guide-onboard-done', '1'); } catch (e) { /* 忽略 */ }
+  $('onboard').style.display = 'none';
 };
 
 /* ---------------- 历程 ---------------- */
@@ -2027,6 +2137,7 @@ $('dec-restore').onclick = async () => {
 function render(d) {
   renderToday(d);
   renderWorld(d.world);
+  renderFriends();
   renderJourney(d);
   renderCapture(d);
   renderBenchmark(d);

@@ -198,6 +198,11 @@ def run(zip_path: Path) -> None:
               and str(ai_saved.get("masked_key", "")).endswith("3456")
               and "sk-smoke-abcdef123456" not in json.dumps(ai_saved),
               "exe 内能保存 AI 钥匙且只回掩码（不泄漏明文）")
+
+        code, fr, _ = call(port1, "/api/friends", cookie=cookie)
+        check(code == 200 and fr.get("ok") and fr.get("me", {}).get("username")
+              and fr.get("friends") == [],
+              "exe 内好友接口可用（没有好友时如实返回空，不塞模拟角色）")
     finally:
         if p1 is not None:
             kill_tree(p1)
